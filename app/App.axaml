@@ -1,0 +1,77 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AuroraStudio.App"
+             RequestedThemeVariant="Dark">
+
+  <Application.Styles>
+    <FluentTheme />
+
+    <!-- App-wide tuning: tighter, denser, professional tool look -->
+    <Style Selector="Window">
+      <Setter Property="Background" Value="#1E1F22"/>
+      <Setter Property="FontFamily" Value="Inter, Segoe UI"/>
+      <Setter Property="FontSize" Value="12.5"/>
+    </Style>
+
+    <Style Selector="Menu">
+      <Setter Property="Background" Value="#191A1C"/>
+      <Setter Property="BorderThickness" Value="0,0,0,1"/>
+      <Setter Property="BorderBrush" Value="#0D0D0F"/>
+    </Style>
+    <Style Selector="MenuItem">
+      <Setter Property="Padding" Value="10,5"/>
+      <Setter Property="FontSize" Value="12.5"/>
+    </Style>
+
+    <Style Selector="Button">
+      <Setter Property="Padding" Value="8,4"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="Background" Value="#2A2C31"/>
+      <Setter Property="MinHeight" Value="26"/>
+    </Style>
+    <Style Selector="Button:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#35373E"/>
+    </Style>
+    <Style Selector="Button:pressed /template/ ContentPresenter">
+      <Setter Property="Background" Value="#4F8CFF"/>
+    </Style>
+
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="#26282C"/>
+      <Setter Property="BorderBrush" Value="#3A3D44"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="MinHeight" Value="26"/>
+      <Setter Property="Padding" Value="6,3"/>
+    </Style>
+
+    <Style Selector="ComboBox">
+      <Setter Property="MinHeight" Value="26"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="Background" Value="#2A2C31"/>
+      <Setter Property="Padding" Value="8,3"/>
+    </Style>
+
+    <Style Selector="Slider">
+      <Setter Property="Padding" Value="0"/>
+    </Style>
+
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="12.5"/>
+      <Setter Property="Padding" Value="10,5"/>
+    </Style>
+
+    <Style Selector="TreeViewItem">
+      <Setter Property="MinHeight" Value="26"/>
+      <Setter Property="Padding" Value="2,0"/>
+    </Style>
+
+    <Style Selector="CheckBox">
+      <Setter Property="MinHeight" Value="24"/>
+    </Style>
+  </Application.Styles>
+
+  <Application.Resources>
+    <Color x:Key="AccentColor">#4F8CFF</Color>
+  </Application.Resources>
+
+</Application>

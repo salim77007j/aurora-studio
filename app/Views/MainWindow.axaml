@@ -1,0 +1,194 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AuroraStudio.Controls;assembly=AuroraStudio"
+        xmlns:panels="clr-namespace:AuroraStudio.Panels;assembly=AuroraStudio"
+        x:Class="AuroraStudio.Views.MainWindow"
+        Title="Aurora Studio"
+        Width="1440" Height="900" MinWidth="1080" MinHeight="640"
+        Background="#1E1F22"
+        WindowStartupLocation="CenterScreen">
+
+  <Window.Resources>
+    <x:Double x:Key="ToolBtnSize">42</x:Double>
+  </Window.Resources>
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+    <!-- ══════════ MENU ══════════ -->
+    <Menu Grid.Row="0" x:Name="MainMenu">
+      <MenuItem Header="_File">
+        <MenuItem Header="New…" Command="{Binding CmdNew}" InputGesture="Ctrl+N"/>
+        <MenuItem Header="Open…" Command="{Binding CmdOpen}" InputGesture="Ctrl+O"/>
+        <Separator/>
+        <MenuItem Header="Save" Command="{Binding CmdSave}" InputGesture="Ctrl+S"/>
+        <MenuItem Header="Export As…" Command="{Binding CmdExport}" InputGesture="Ctrl+Shift+E"/>
+        <Separator/>
+        <MenuItem Header="Close Document" Command="{Binding CmdCloseDoc}"/>
+        <MenuItem Header="Exit" Command="{Binding CmdExit}"/>
+      </MenuItem>
+      <MenuItem Header="_Edit">
+        <MenuItem Header="Undo" Command="{Binding CmdUndo}" InputGesture="Ctrl+Z"/>
+        <MenuItem Header="Redo" Command="{Binding CmdRedo}" InputGesture="Ctrl+Y"/>
+        <Separator/>
+        <MenuItem Header="Fill with Foreground" Command="{Binding CmdFill}"/>
+        <MenuItem Header="Clear (Delete)" Command="{Binding CmdClear}" InputGesture="Delete"/>
+        <Separator/>
+        <MenuItem Header="Keyboard Shortcuts…" Command="{Binding CmdShortcuts}"/>
+        <MenuItem Header="Preferences…" Command="{Binding CmdPrefs}"/>
+      </MenuItem>
+      <MenuItem Header="_Image">
+        <MenuItem Header="Image Size…" Command="{Binding CmdImageSize}"/>
+        <MenuItem Header="Canvas Size…" Command="{Binding CmdCanvasSize}"/>
+        <Separator/>
+        <MenuItem Header="Rotate 90° Clockwise" Command="{Binding CmdRot90}"/>
+        <MenuItem Header="Rotate 180°" Command="{Binding CmdRot180}"/>
+        <MenuItem Header="Rotate 90° Counter-Clockwise" Command="{Binding CmdRot270}"/>
+        <Separator/>
+        <MenuItem Header="Flip Horizontal" Command="{Binding CmdFlipH}"/>
+        <MenuItem Header="Flip Vertical" Command="{Binding CmdFlipV}"/>
+        <Separator/>
+        <MenuItem Header="Crop to Selection" Command="{Binding CmdCropSel}"/>
+        <MenuItem Header="Flatten Image" Command="{Binding CmdFlatten}"/>
+      </MenuItem>
+      <MenuItem Header="_Layer">
+        <MenuItem Header="New Layer" Command="{Binding CmdLayerNew}" InputGesture="Ctrl+Shift+N"/>
+        <MenuItem Header="New Group" Command="{Binding CmdLayerGroup}"/>
+        <MenuItem Header="Duplicate Layer" Command="{Binding CmdLayerDup}" InputGesture="Ctrl+J"/>
+        <MenuItem Header="Delete Layer" Command="{Binding CmdLayerDel}"/>
+        <Separator/>
+        <MenuItem Header="Add Mask from Selection" Command="{Binding CmdMaskAdd}"/>
+        <MenuItem Header="Apply Mask" Command="{Binding CmdMaskApply}"/>
+        <MenuItem Header="Delete Mask" Command="{Binding CmdMaskDel}"/>
+        <Separator/>
+        <MenuItem Header="Merge Down" Command="{Binding CmdMergeDown}" InputGesture="Ctrl+E"/>
+        <MenuItem Header="Move Layer Up" Command="{Binding CmdLayerUp}"/>
+        <MenuItem Header="Move Layer Down" Command="{Binding CmdLayerDown}"/>
+      </MenuItem>
+      <MenuItem Header="_Select">
+        <MenuItem Header="All" Command="{Binding CmdSelAll}" InputGesture="Ctrl+A"/>
+        <MenuItem Header="Deselect" Command="{Binding CmdSelNone}" InputGesture="Ctrl+D"/>
+        <MenuItem Header="Invert" Command="{Binding CmdSelInvert}" InputGesture="Ctrl+Shift+I"/>
+        <Separator/>
+        <MenuItem Header="Feather…" Command="{Binding CmdFeather}"/>
+      </MenuItem>
+      <MenuItem Header="F_ilter">
+        <MenuItem Header="Gaussian Blur…" Command="{Binding CmdFGauss}"/>
+        <MenuItem Header="Sharpen…" Command="{Binding CmdFSharpen}"/>
+        <MenuItem Header="Add Noise…" Command="{Binding CmdFNoise}"/>
+        <MenuItem Header="Pixelate…" Command="{Binding CmdFPixelate}"/>
+        <Separator/>
+        <MenuItem Header="Distort">
+          <MenuItem Header="Twirl…" Command="{Binding CmdFTwirl}"/>
+          <MenuItem Header="Wave…" Command="{Binding CmdFWave}"/>
+          <MenuItem Header="Emboss" Command="{Binding CmdFEmboss}"/>
+        </MenuItem>
+      </MenuItem>
+      <MenuItem Header="_Colors">
+        <MenuItem Header="Brightness / Contrast…" Command="{Binding CmdAdjBC}"/>
+        <MenuItem Header="Levels…" Command="{Binding CmdAdjLevels}"/>
+        <MenuItem Header="Curves…" Command="{Binding CmdAdjCurves}"/>
+        <MenuItem Header="Hue / Saturation…" Command="{Binding CmdAdjHSL}"/>
+      </MenuItem>
+      <MenuItem Header="_View">
+        <MenuItem Header="Zoom In" Command="{Binding CmdZoomIn}" InputGesture="Ctrl++"/>
+        <MenuItem Header="Zoom Out" Command="{Binding CmdZoomOut}" InputGesture="Ctrl+-"/>
+        <MenuItem Header="Fit on Screen" Command="{Binding CmdZoomFit}" InputGesture="Ctrl+0"/>
+        <MenuItem Header="Actual Pixels" Command="{Binding CmdZoom100}" InputGesture="Ctrl+1"/>
+        <Separator/>
+        <MenuItem Header="Workspace">
+          <MenuItem Header="Default" Command="{Binding CmdWsDefault}"/>
+          <MenuItem Header="Minimal" Command="{Binding CmdWsMinimal}"/>
+          <MenuItem Header="Painting" Command="{Binding CmdWsPainting}"/>
+        </MenuItem>
+        <MenuItem x:Name="MnuToggleHistory" Header="Show History Panel" Command="{Binding CmdToggleHistory}"/>
+      </MenuItem>
+      <MenuItem Header="_Help">
+        <MenuItem Header="About Aurora Studio" Command="{Binding CmdAbout}"/>
+      </MenuItem>
+    </Menu>
+
+    <!-- ══════════ TOOL OPTIONS BAR ══════════ -->
+    <Border Grid.Row="1" Background="#252629" BorderBrush="#0D0D0F" BorderThickness="0,0,0,1" Padding="10,5">
+      <ContentControl x:Name="OptionsBar" HorizontalContentAlignment="Left"/>
+    </Border>
+
+    <!-- ══════════ WORK AREA ══════════ -->
+    <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto">
+
+      <!-- TOOL PALETTE -->
+      <Border Grid.Column="0" Background="#252629" BorderBrush="#0D0D0F" BorderThickness="0,0,1,0" Padding="4,6">
+        <ItemsControl x:Name="ToolPalette">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Vertical" Spacing="2"/></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Button Classes="toolbtn" Width="42" Height="42" CornerRadius="6"
+                      Click="OnToolClick" Tag="{Binding}"
+                      ToolTip.Tip="{Binding Tooltip}">
+                <Panel>
+                  <Path Data="{Binding Geometry}" Stroke="{Binding Foreground}" StrokeThickness="1.6"
+                        StrokeLineCap="Round"
+                        Width="21" Height="21" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Panel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Border>
+
+      <!-- CENTER: tabs + canvas -->
+      <Grid Grid.Column="1" RowDefinitions="Auto,*">
+        <Border Grid.Row="0" Background="#1A1B1D" BorderBrush="#0D0D0F" BorderThickness="0,0,0,1">
+          <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="DocTabs" Margin="4,2">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2"/></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Classes="doctab" Padding="10,4" CornerRadius="5,5,0,0" Background="{Binding TabBrush}"
+                          Tapped="OnTabTapped">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="{Binding Title}" VerticalAlignment="Center" Foreground="{Binding TabForeground}"/>
+                      <TextBlock Text="✕" FontSize="10" Opacity="0.7" VerticalAlignment="Center"
+                                 Tapped="OnTabCloseTapped" Cursor="Hand"/>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+        <Grid Grid.Row="1">
+          <local:CanvasView x:Name="Canvas"/>
+          <Canvas x:Name="CanvasOverlay" IsHitTestVisible="False"/>
+        </Grid>
+      </Grid>
+
+      <!-- RIGHT PANELS -->
+      <Border Grid.Column="2" Background="#252629" BorderBrush="#0D0D0F" BorderThickness="1,0,0,0" Width="292">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="8" Margin="8,8,8,8">
+            <ContentControl x:Name="ColorPanelHost"/>
+            <ContentControl x:Name="LayersPanelHost"/>
+            <ContentControl x:Name="HistoryPanelHost"/>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+
+    <!-- ══════════ STATUS BAR ══════════ -->
+    <Border Grid.Row="3" Background="#191A1C" BorderBrush="#0D0D0F" BorderThickness="0,1,0,0" Padding="12,4">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto">
+        <TextBlock x:Name="StatusTool" Grid.Column="0" Foreground="#9AA0A6" Text="Ready"/>
+        <TextBlock x:Name="StatusMsg" Grid.Column="1" Foreground="#6E7378" Margin="16,0" Text=""/>
+        <TextBlock x:Name="StatusPos" Grid.Column="2" Foreground="#9AA0A6" Text=""/>
+        <TextBlock x:Name="StatusSel" Grid.Column="3" Foreground="#9AA0A6" Margin="16,0" Text=""/>
+        <TextBlock x:Name="StatusZoom" Grid.Column="4" Foreground="#9AA0A6" Margin="16,0" Text="100%"/>
+        <TextBlock x:Name="StatusSize" Grid.Column="5" Foreground="#9AA0A6" Margin="16,0" Text=""/>
+        <TextBlock x:Name="StatusEngine" Grid.Column="6" Foreground="#6E7378" Margin="16,0,0,0" Text=""/>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

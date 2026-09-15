@@ -1,0 +1,184 @@
+name: Build & Verify Aurora Studio
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: Windows x64 (exe + selftest + screenshots)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable, MSVC)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            engine/target
+          key: cargo-win-${{ hashFiles('engine/Cargo.lock') }}
+
+      - name: Build engine (release cdylib)
+        working-directory: engine
+        run: cargo build --release
+        shell: pwsh
+
+      - name: Stage engine dll
+        run: |
+          Copy-Item engine\target\release\aurora_engine.dll app\aurora_engine.dll
+          Get-Item app\aurora_engine.dll | Select-Object Length
+        shell: pwsh
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish app (self-contained single-file)
+        working-directory: app
+        run: |
+          dotnet publish -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -o publish
+          Get-ChildItem publish | Select-Object Name, Length
+        shell: pwsh
+
+      - name: Engine self-test (real exe, no UI needed)
+        working-directory: app\publish
+        run: |
+          .\AuroraStudio.exe --selftest
+          if ($LASTEXITCODE -ne 0) { throw "engine selftest failed with $LASTEXITCODE" }
+        shell: pwsh
+
+      - name: UI smoke test + screenshots (real window on runner desktop)
+        working-directory: app\publish
+        run: |
+          $ready = Join-Path $env:TEMP "aurora_ready.txt"
+          Remove-Item $ready -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath ".\AuroraStudio.exe" -ArgumentList "--autodemo", $ready -PassThru
+          $ok = $false
+          for ($i = 0; $i -lt 90; $i++) {
+            if (Test-Path $ready) { $ok = (Get-Content $ready) -eq "ok"; break }
+            if ($p.HasExited) { break }
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $ok) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }; throw "autodemo did not reach ready state" }
+          Start-Sleep -Seconds 2
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save("$PWD\screenshot_main.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          $g.Dispose(); $bmp.Dispose()
+          Start-Sleep -Milliseconds 800
+          $bmp2 = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g2 = [System.Drawing.Graphics]::FromImage($bmp2)
+          $g2.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp2.Save("$PWD\screenshot_main2.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          $g2.Dispose(); $bmp2.Dispose()
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          Get-ChildItem screenshot_*.png | Select-Object Name, Length
+        shell: pwsh
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuroraStudio-windows-x64
+          path: |
+            app/publish/AuroraStudio.exe
+            app/publish/screenshot_main.png
+            app/publish/screenshot_main2.png
+          if-no-files-found: error
+
+  linux:
+    name: Linux x64 (so + xvfb verification)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            engine/target
+          key: cargo-linux-${{ hashFiles('engine/Cargo.lock') }}
+
+      - name: Build engine (release)
+        working-directory: engine
+        run: cargo build --release
+
+      - name: Stage engine .so
+        run: |
+          cp engine/target/release/libaurora_engine.so app/aurora_engine.so
+          ls -la app/aurora_engine.so
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish app (self-contained single-file)
+        working-directory: app
+        run: |
+          dotnet publish -c Release -r linux-x64 --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:EnableCompressionInSingleFile=true \
+            -o publish
+          ls -la publish
+
+      - name: Engine self-test
+        working-directory: app/publish
+        run: |
+          ./AuroraStudio --selftest
+
+      - name: UI verification under Xvfb (software GL)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb ffmpeg libx11-6 libgl1 mesa-utils
+          mkdir -p app/publish/shots
+          rm -f /tmp/aurora_ready
+          Xvfb :77 -screen 0 1600x1000x24 -nolisten tcp &
+          sleep 2
+          DISPLAY=:77 LIBGL_ALWAYS_SOFTWARE=1 ./app/publish/AuroraStudio --autodemo /tmp/aurora_ready &
+          APP_PID=$!
+          ok=no
+          for i in $(seq 1 120); do
+            if [ -f /tmp/aurora_ready ]; then ok=$(cat /tmp/aurora_ready); break; fi
+            kill -0 $APP_PID 2>/dev/null || break
+            sleep 0.5
+          done
+          if [ "$ok" != "ok" ]; then kill $APP_PID 2>/dev/null; echo "autodemo failed"; exit 1; fi
+          sleep 2
+          DISPLAY=:77 ffmpeg -y -loglevel error -f x11grab -video_size 1600x1000 -i :77 -frames:v 1 app/publish/shots/linux_main.png
+          sleep 1
+          DISPLAY=:77 ffmpeg -y -loglevel error -f x11grab -video_size 1600x1000 -i :77 -frames:v 1 app/publish/shots/linux_main2.png
+          kill $APP_PID 2>/dev/null
+          ls -la app/publish/shots
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuroraStudio-linux-x64
+          path: |
+            app/publish/AuroraStudio
+            app/publish/shots/linux_main.png
+            app/publish/shots/linux_main2.png
+          if-no-files-found: error
