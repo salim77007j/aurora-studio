@@ -56,8 +56,8 @@ jobs:
       - name: Engine self-test (real exe, no UI needed)
         working-directory: app\publish
         run: |
-          .\AuroraStudio.exe --selftest
-          if ($LASTEXITCODE -ne 0) { throw "engine selftest failed with $LASTEXITCODE" }
+          $proc = Start-Process -FilePath ".\AuroraStudio.exe" -ArgumentList "--selftest" -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "engine selftest failed with $($proc.ExitCode)" }
         shell: pwsh
 
       - name: UI smoke test + screenshots (real window on runner desktop)
