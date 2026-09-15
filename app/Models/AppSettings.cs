@@ -13,8 +13,10 @@ public class AppSettings
     public bool ShowLayersPanel { get; set; } = true;
     public string Workspace { get; set; } = "Default";
     public Dictionary<string, string> Shortcuts { get; set; } = new();
-    public double WindowWidth { get; set; } = 1440;
-    public double WindowHeight { get; set; } = 900;
+    public double WindowWidth { get; set; } = 0;   // 0 = auto-fit to screen on first launch
+    public double WindowHeight { get; set; } = 0;  // 0 = auto-fit to screen on first launch
+    public double RightDockWidth { get; set; } = 292;
+    public bool WindowMaximized { get; set; } = false;
 
     [System.Text.Json.Serialization.JsonIgnore]
     public static readonly Dictionary<string, string> DefaultShortcuts = new()
@@ -68,7 +70,8 @@ public enum ToolKind
     Move, Brush, Pencil, Eraser,
     RectSelect, EllipseSelect, Lasso, Wand,
     Eyedropper, Bucket, Gradient,
-    Text, Shape, Crop, Transform
+    Text, Shape, Crop, Transform,
+    Hand, Zoom
 }
 
 public static class ToolInfo
@@ -90,6 +93,8 @@ public static class ToolInfo
         ToolKind.Shape => "Shape",
         ToolKind.Crop => "Crop",
         ToolKind.Transform => "Free Transform",
+        ToolKind.Hand => "Pan",
+        ToolKind.Zoom => "Zoom",
         _ => ""
     };
 
@@ -99,6 +104,7 @@ public static class ToolInfo
         ToolKind.RectSelect => "M", ToolKind.EllipseSelect => "J", ToolKind.Lasso => "L", ToolKind.Wand => "W",
         ToolKind.Eyedropper => "I", ToolKind.Bucket => "G", ToolKind.Gradient => "R",
         ToolKind.Text => "T", ToolKind.Shape => "U", ToolKind.Crop => "C", ToolKind.Transform => "Ctrl+T",
+        ToolKind.Hand => "H / Space", ToolKind.Zoom => "Z",
         _ => ""
     };
 }

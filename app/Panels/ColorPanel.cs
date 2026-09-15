@@ -307,16 +307,17 @@ public class ColorPanel : Border
 
     internal static IBrush Brush(byte r, byte g, byte b) => new SolidColorBrush(Color.FromRgb(r, g, b));
 
-    internal static StackPanel PanelHeader(string title)
+    internal static Border PanelHeader(string title)
     {
         var sp = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 6 };
         sp.Children.Add(new TextBlock
         {
             Text = title.ToUpperInvariant(),
-            FontSize = 11,
-            FontWeight = FontWeight.SemiBold,
-            Foreground = Brush(0xB9, 0xBE, 0xC5),
         });
-        return sp;
+        return new Border
+        {
+            Classes = { "panelHead" },
+            Child = sp,
+        };
     }
 }

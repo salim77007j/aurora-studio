@@ -31,6 +31,7 @@ public class ToolItem
     public string Icon { get; init; } = "";
     public Geometry Geometry => Icons.Get(Icon);
     public string Tooltip { get; init; } = "";
+    public bool IsActive { get; set; }
     public IBrush Foreground { get; set; } = new SolidColorBrush(Color.FromRgb(0xAA, 0xAF, 0xB6));
 }
 
@@ -48,7 +49,9 @@ public partial class MainWindow : Window
     public ObservableCollection<DocTabItem> Tabs { get; } = new();
     public List<ToolItem> Tools { get; } = new();
 
-    public AuroraDocument? ActiveDoc => Tabs.FirstOrDefault(t => t._selected)?.Doc;
+    /// <summary>The document shown in the canvas: filter-dialog preview while a dialog is open, else the active tab.</summary>
+    public AuroraDocument? ActiveDoc => _displayOverride ?? Tabs.FirstOrDefault(t => t._selected)?.Doc;
+    private AuroraDocument? _displayOverride;
     public ToolKind CurrentTool { get; private set; } = ToolKind.Brush;
 
     public Color ForegroundColor { get; set; } = Colors.Black;
@@ -123,11 +126,21 @@ public partial class MainWindow : Window
 
         Closed += (_, _) =>
         {
-            _settings.Save();
+            try
+            {
+                _settings.WindowWidth = Width;
+                _settings.WindowHeight = Height;
+                _settings.WindowMaximized = WindowState == WindowState.Maximized;
+                var dock = FindAny<Border>("RightDock");
+                if (dock != null) _settings.RightDockWidth = dock.Width;
+                _settings.Save();
+            }
+            catch { }
             foreach (var t in Tabs) t.Doc.Dispose();
         };
         Opened += (_, _) =>
         {
+            ApplySavedLayout();
             Title = $"Aurora Studio — {Interop.Engine.Version()}";
             var el = FindAny<TextBlock>("StatusEngine");
             if (el != null) el.Text = Interop.Engine.Version();
@@ -136,13 +149,71 @@ public partial class MainWindow : Window
 
             // CI/demo automation (real operations, real UI state)
             var args = Environment.GetCommandLineArgs();
+            var toolIdx = Array.IndexOf(args, "--tooldemo");
             var demoIdx = Array.IndexOf(args, "--autodemo");
-            if (demoIdx >= 0 && demoIdx + 1 < args.Length)
+            if (toolIdx >= 0 && toolIdx + 2 < args.Length)
+                ToolDemo.Run(this, args[toolIdx + 1], args[toolIdx + 2]);
+            else if (demoIdx >= 0 && demoIdx + 1 < args.Length)
                 AutoDemo.Run(this, args[demoIdx + 1]);
         };
 
         AddHandler(KeyDownEvent, OnGlobalKeyDown, RoutingStrategies.Tunnel);
     }
+
+    /// <summary>
+    /// Fit the window to the actual screen (never taller/wider than the working area),
+    /// restore previous size if the user resized, center on the monitor. Fixes layouts
+    /// "not optimized for the screen" (e.g. a 900px-tall window on a 768px laptop panel).
+    /// </summary>
+    private void ApplySavedLayout()
+    {
+        try
+        {
+            var scr = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+            var wa = scr.WorkingArea;                 // physical pixels
+            double scale = RenderScaling;             // DIPs per physical pixel on that screen
+            double waW = wa.Width / scale;
+            double waH = wa.Height / scale;
+
+            double defW = Math.Min(waW * 0.92, 1720);
+            double defH = Math.Min(waH * 0.92, 1080);
+
+            double w = _settings.WindowWidth > 100 ? _settings.WindowWidth : defW;
+            double h = _settings.WindowHeight > 100 ? _settings.WindowHeight : defH;
+
+            w = Math.Clamp(w, MinWidth, Math.Max(MinWidth, waW));
+            h = Math.Clamp(h, MinHeight, Math.Max(MinHeight, waH));
+            Width = w; Height = h;
+
+            if (_settings.RightDockWidth >= MinWidth_ofDock && _settings.RightDockWidth <= 520)
+            {
+                var dock = FindAny<Border>("RightDock");
+                if (dock != null) dock.Width = _settings.RightDockWidth;
+            }
+
+            int px = wa.X + Math.Max(0, (wa.Width - (int)(w * scale)) / 2);
+            int py = wa.Y + Math.Max(0, (wa.Height - (int)(h * scale)) / 2);
+            Position = new PixelPoint(px, py);
+
+            if (_settings.WindowMaximized && waW > MinWidth && waH > MinHeight)
+                WindowState = WindowState.Maximized;
+
+            // restore workspace panel visibility
+            var s = AuroraStudio.App.Settings;
+            if (s != null)
+            {
+                LayersPanelCtl.IsVisible = s.ShowLayersPanel;
+                ColorPanelCtl.IsVisible = s.ShowColorPanel;
+                HistoryPanelCtl.IsVisible = s.ShowHistoryPanel;
+            }
+        }
+        catch (Exception ex)
+        {
+            Program.WriteCrash("LAYOUT", ex);
+        }
+    }
+
+    private const double MinWidth_ofDock = 236;
 
     private void InitializeComponent()
     {
@@ -193,6 +264,8 @@ public partial class MainWindow : Window
             (ToolKind.Shape, "tool.shape", "Shape (U)"),
             (ToolKind.Crop, "tool.crop", "Crop (C)"),
             (ToolKind.Transform, "tool.transform", "Free Transform (Ctrl+T)"),
+            (ToolKind.Hand, "tool.hand", "Pan (H, or hold Space)"),
+            (ToolKind.Zoom, "tool.zoom", "Zoom (Z) — click zooms in, Alt/right-click zooms out"),
         };
         foreach (var (kind, icon, tip) in defs)
             Tools.Add(new ToolItem { Kind = kind, Icon = icon, Tooltip = tip });
@@ -208,7 +281,10 @@ public partial class MainWindow : Window
     {
         CurrentTool = kind;
         foreach (var t in Tools)
-            t.Foreground = new SolidColorBrush(t.Kind == kind ? Color.FromRgb(0x4F, 0x8C, 0xFF) : Color.FromRgb(0xAA, 0xAF, 0xB6));
+        {
+            t.IsActive = t.Kind == kind;
+            t.Foreground = new SolidColorBrush(t.Kind == kind ? Color.FromRgb(0x7F, 0xB1, 0xFF) : Color.FromRgb(0xAA, 0xAF, 0xB6));
+        }
         TheToolPalette.ItemsSource = null;
         TheToolPalette.ItemsSource = Tools;
         BuildOptionsBar();
@@ -562,16 +638,21 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Rasterize a RenderTargetBitmap to PNG and paste via the engine (real pixels, no fakes).</summary>
-    public static void PasteRtbToLayer(AuroraDocument doc, RenderTargetBitmap rtb, int docX, int docY)
+    public static int PasteRtbToLayer(AuroraDocument doc, RenderTargetBitmap rtb, int docX, int docY)
     {
         using var ms = new MemoryStream();
         rtb.Save(ms);
         var png = ms.ToArray();
+        int rc;
         unsafe
         {
             fixed (byte* p = png)
-                Engine.aurora_paste_png(doc.Handle, doc.State.ActiveId, docX, docY, p, (uint)png.Length);
+                rc = Engine.aurora_paste_png(doc.Handle, Engine.ActiveLayer(doc.Handle), docX, docY, p, (uint)png.Length);
         }
+        Console.Error.WriteLine($"[aurora:paste] doc={doc.Handle} '{doc.Title}' layer={Engine.ActiveLayer(doc.Handle)} at=({docX},{docY}) size={rtb.PixelSize.Width}x{rtb.PixelSize.Height} png={png.Length}B rc={rc}");
+        if (rc != 0)
+            Program.WriteCrash("PASTE", new Exception($"aurora_paste_png rc={rc}: {Engine.LastError()} (png={png.Length}B, at {docX},{docY}, layer={Engine.ActiveLayer(doc.Handle)})"));
+        return rc;
     }
 
     public void CommitShape(Point start, Point end)

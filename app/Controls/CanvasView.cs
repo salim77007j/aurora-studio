@@ -107,12 +107,23 @@ public class CanvasView : Control
 
     private void OnDocSwitched()
     {
+        ResetForDocSwitch();
+        InvalidateVisual();
+    }
+
+    /// <summary>Drop cached composite + refit view (doc switch or preview-document switch).</summary>
+    public void ResetForDocSwitch()
+    {
         _bitmap = null;
         _pixelBuf = Array.Empty<byte>();
+        _lastVersion = 0;
+        _antsCacheDoc = 0;
+        _antsCache = new List<List<Point>>();
+        _cropRect = null;
+        _transformRect = null;
         Zoom = 1.0;
         Pan = new Vector(0, 0);
         FitOrActual();
-        InvalidateVisual();
     }
 
     // ---------------- coordinate mapping ----------------
@@ -406,6 +417,12 @@ public class CanvasView : Control
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
+        try { OnPointerPressedCore(e); }
+        catch (Exception ex) { Program.WriteCrash("CANVAS-PRESS", ex); }
+    }
+
+    private void OnPointerPressedCore(PointerPressedEventArgs e)
+    {
         Focus();
         var doc = _win.ActiveDoc;
         if (doc == null) return;
@@ -422,10 +439,32 @@ public class CanvasView : Control
             e.Handled = true;
             return;
         }
+
+        var tool = _win.CurrentTool;
+
+        // hand tool: drag to pan
+        if (tool == ToolKind.Hand)
+        {
+            _panning = true;
+            _panStart = screen;
+            _panStartPan = Pan;
+            e.Pointer.Capture(this);
+            e.Handled = true;
+            return;
+        }
+
+        // zoom tool: click = in, alt/right-click = out
+        if (tool == ToolKind.Zoom)
+        {
+            bool zoomOut = e.KeyModifiers.HasFlag(KeyModifiers.Alt) || pt.Properties.IsRightButtonPressed;
+            ZoomAt(zoomOut ? 1 / 1.5 : 1.5, screen);
+            e.Handled = true;
+            return;
+        }
+
         if (!pt.Properties.IsLeftButtonPressed) return;
 
         var dp = ScreenToDoc(screen);
-        var tool = _win.CurrentTool;
         e.Pointer.Capture(this);
         _drawing = true;
         _dragStart = dp;
@@ -443,7 +482,7 @@ public class CanvasView : Control
                 var bp = _win.MakeBrushParams(tool);
                 unsafe
                 {
-                    Engine.aurora_brush_begin(doc.Handle, doc.State.ActiveId, &bp, (float)dp.X, (float)dp.Y, _lastPressure);
+                    Engine.aurora_brush_begin(doc.Handle, Engine.ActiveLayer(doc.Handle), &bp, (float)dp.X, (float)dp.Y, _lastPressure);
                 }
                 PollComposite();
                 break;
@@ -492,6 +531,12 @@ public class CanvasView : Control
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        try { OnPointerMovedCore(e); }
+        catch (Exception ex) { Program.WriteCrash("CANVAS-MOVE", ex); }
+    }
+
+    private void OnPointerMovedCore(PointerEventArgs e)
     {
         var doc = _win.ActiveDoc;
         if (doc == null) return;
@@ -546,6 +591,12 @@ public class CanvasView : Control
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        try { OnPointerReleasedCore(e); }
+        catch (Exception ex) { Program.WriteCrash("CANVAS-RELEASE", ex); }
+    }
+
+    private void OnPointerReleasedCore(PointerReleasedEventArgs e)
     {
         var doc = _win.ActiveDoc;
         _panning = false;
@@ -640,6 +691,12 @@ public class CanvasView : Control
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        try { OnPointerWheelChangedCore(e); }
+        catch (Exception ex) { Program.WriteCrash("CANVAS-WHEEL", ex); }
+    }
+
+    private void OnPointerWheelChangedCore(PointerWheelEventArgs e)
     {
         if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
@@ -741,7 +798,7 @@ public class CanvasView : Control
         unsafe
         {
             fixed (float* mp = m)
-                Engine.aurora_layer_warp(doc.Handle, doc.State.ActiveId, 0, mp, doc.Width, doc.Height);
+                Engine.aurora_layer_warp(doc.Handle, Engine.ActiveLayer(doc.Handle), 0, mp, doc.Width, doc.Height);
         }
         _transformRect = null;
         doc.RefreshState();

@@ -31,6 +31,7 @@ public static unsafe class Engine
     [DllImport(Dll)] public static extern int aurora_layer_set_blend(ulong h, ulong id, int blend);
     [DllImport(Dll)] public static extern int aurora_layer_set_name(ulong h, ulong id, byte* name);
     [DllImport(Dll)] public static extern int aurora_layer_set_active(ulong h, ulong id);
+    [DllImport(Dll)] public static extern ulong aurora_active_layer(ulong h);
     [DllImport(Dll)] public static extern int aurora_layer_set_locked(ulong h, ulong id, int v);
     [DllImport(Dll)] public static extern int aurora_layer_move_node(ulong h, ulong id, long newParent, int newIndex);
     [DllImport(Dll)] public static extern int aurora_layer_move_up(ulong h, ulong id);
@@ -119,6 +120,9 @@ public static unsafe class Engine
             return Encoding.UTF8.GetString(_errBuf, 0, len);
         }
     }
+
+    /// <summary>Query the engine for the CURRENT active layer (never stale).</summary>
+    public static ulong ActiveLayer(ulong h) => h == 0 ? 0 : aurora_active_layer(h);
 
     public static string Version()
     {

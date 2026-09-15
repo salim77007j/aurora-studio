@@ -1332,6 +1332,7 @@ pub extern "C" fn aurora_fill(h: u64, r: u8, g: u8, b: u8, a: u8) -> i32 {
         if let Some(region) = paint::fill(&mut doc, color) {
             let after = pixel_region_after(&mut doc, layer_id, region);
             doc.history.push(undo::Command::Pixels { layer_id, rect: region, before, after, label: "Fill".into() });
+            doc.process_dirty();
             0
         } else {
             -1
@@ -1373,7 +1374,8 @@ pub extern "C" fn aurora_bucket(h: u64, x: i32, y: i32, r: u8, g: u8, b: u8, a: 
         if let Some(region) = paint::bucket(&mut doc, x, y, [r, g, b, a], tolerance, contiguous != 0) {
             let after = pixel_region_after(&mut doc, layer_id, region);
             doc.history.push(undo::Command::Pixels { layer_id, rect: region, before, after, label: "Paint Bucket".into() });
-            0
+                        doc.process_dirty();
+0
         } else {
             set_err("bucket: no pixels changed");
             -1
@@ -1397,7 +1399,8 @@ pub extern "C" fn aurora_gradient(h: u64, x0: f32, y0: f32, x1: f32, y1: f32, ki
             [fr, fgn, fb, fa], [br, bgc, bb, ba], dither != 0) {
             let after = pixel_region_after(&mut doc, layer_id, region);
             doc.history.push(undo::Command::Pixels { layer_id, rect: region, before, after, label: "Gradient".into() });
-            0
+                        doc.process_dirty();
+0
         } else {
             -1
         }
@@ -1786,6 +1789,7 @@ pub extern "C" fn aurora_image_resize(h: u64, nw: u32, nh: u32, interp: i32) -> 
             after: Box::new(after),
             label: "Image Size".into(),
         });
+        doc.process_dirty();
         0
     })
     .unwrap_or(-1)
@@ -1812,6 +1816,7 @@ pub extern "C" fn aurora_canvas_resize(h: u64, nw: u32, nh: u32, anchor: i32) ->
             after: Box::new(after),
             label: "Canvas Size".into(),
         });
+        doc.process_dirty();
         0
     })
     .unwrap_or(-1)
@@ -1830,6 +1835,7 @@ pub extern "C" fn aurora_doc_crop(h: u64, x: i32, y: i32, w: u32, hh: u32) -> i3
             after: Box::new(after),
             label: "Crop".into(),
         });
+        doc.process_dirty();
         0
     })
     .unwrap_or(-1)
@@ -1848,6 +1854,7 @@ pub extern "C" fn aurora_image_rotate(h: u64, turns: i32) -> i32 {
             after: Box::new(after),
             label: "Rotate Canvas".into(),
         });
+        doc.process_dirty();
         0
     })
     .unwrap_or(-1)
@@ -1870,6 +1877,7 @@ pub extern "C" fn aurora_image_flip(h: u64, axis: i32) -> i32 {
             after: Box::new(after),
             label: "Flip Canvas".into(),
         });
+        doc.process_dirty();
         0
     })
     .unwrap_or(-1)
@@ -1927,6 +1935,7 @@ pub extern "C" fn aurora_layer_flip(h: u64, id: u64, axis: i32) -> i32 {
         transform::flip_layer(&mut doc, id, axis);
         let after = undo::DocSnapshot::capture(&doc);
         doc.history.push(undo::Command::DocSnapshot { before: Box::new(before), after: Box::new(after), label: "Flip Layer".into() });
+        doc.process_dirty();
         0
     })
     .unwrap_or(-1)
@@ -1941,6 +1950,7 @@ pub extern "C" fn aurora_layer_rotate(h: u64, id: u64, degrees: f32, expand: i32
         transform::rotate_layer(&mut doc, id, degrees, expand != 0);
         let after = undo::DocSnapshot::capture(&doc);
         doc.history.push(undo::Command::DocSnapshot { before: Box::new(before), after: Box::new(after), label: "Rotate Layer".into() });
+        doc.process_dirty();
         0
     })
     .unwrap_or(-1)
@@ -1955,6 +1965,7 @@ pub extern "C" fn aurora_layer_move_by(h: u64, id: u64, dx: i32, dy: i32) -> i32
         transform::move_layer(&mut doc, id, dx, dy);
         let after = undo::DocSnapshot::capture(&doc);
         doc.history.push(undo::Command::DocSnapshot { before: Box::new(before), after: Box::new(after), label: "Move Layer".into() });
+        doc.process_dirty();
         0
     })
     .unwrap_or(-1)
@@ -1987,9 +1998,21 @@ pub extern "C" fn aurora_layer_warp(h: u64, id: u64, mode: i32, m: *const f32, n
         }
         let after = undo::DocSnapshot::capture(&doc);
         doc.history.push(undo::Command::DocSnapshot { before: Box::new(before), after: Box::new(after), label: "Transform".into() });
+        doc.process_dirty();
         0
     })
     .unwrap_or(-1)
+}
+
+/// Current active layer id (source of truth — avoids stale cached state in the UI).
+#[no_mangle]
+pub extern "C" fn aurora_active_layer(h: u64) -> u64 {
+    guard(|| {
+        let d = get_doc(h);
+        let doc = d.lock().unwrap();
+        doc.active_id
+    })
+    .unwrap_or(0)
 }
 
 // ===================== io =====================

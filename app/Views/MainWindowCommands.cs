@@ -45,14 +45,14 @@ public partial class MainWindow : Window
 
     public ICommand CmdLayerNew => Cmd("CmdLayerNew", () => { var d = Doc(); if (d != null) { Engine.LayerAdd(d.Handle, -1, "Layer", 0); RefreshAll(); } });
     public ICommand CmdLayerGroup => Cmd("CmdLayerGroup", () => { var d = Doc(); if (d != null) { Engine.LayerAddGroup(d.Handle, "Group"); RefreshAll(); } });
-    public ICommand CmdLayerDup => Cmd("CmdLayerDup", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_duplicate(d.Handle, d.State.ActiveId); RefreshAll(); } });
-    public ICommand CmdLayerDel => Cmd("CmdLayerDel", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_delete(d.Handle, d.State.ActiveId); RefreshAll(); } });
-    public ICommand CmdMaskAdd => Cmd("CmdMaskAdd", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_mask_from_selection(d.Handle, d.State.ActiveId); RefreshAll(); } });
-    public ICommand CmdMaskApply => Cmd("CmdMaskApply", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_mask_apply(d.Handle, d.State.ActiveId); RefreshAll(); } });
-    public ICommand CmdMaskDel => Cmd("CmdMaskDel", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_mask_delete(d.Handle, d.State.ActiveId); RefreshAll(); } });
-    public ICommand CmdMergeDown => Cmd("CmdMergeDown", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_merge_down(d.Handle, d.State.ActiveId); RefreshAll(); } });
-    public ICommand CmdLayerUp => Cmd("CmdLayerUp", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_move_up(d.Handle, d.State.ActiveId); RefreshAll(); } });
-    public ICommand CmdLayerDown => Cmd("CmdLayerDown", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_move_down(d.Handle, d.State.ActiveId); RefreshAll(); } });
+    public ICommand CmdLayerDup => Cmd("CmdLayerDup", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_duplicate(d.Handle, Engine.ActiveLayer(d.Handle)); RefreshAll(); } });
+    public ICommand CmdLayerDel => Cmd("CmdLayerDel", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_delete(d.Handle, Engine.ActiveLayer(d.Handle)); RefreshAll(); } });
+    public ICommand CmdMaskAdd => Cmd("CmdMaskAdd", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_mask_from_selection(d.Handle, Engine.ActiveLayer(d.Handle)); RefreshAll(); } });
+    public ICommand CmdMaskApply => Cmd("CmdMaskApply", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_mask_apply(d.Handle, Engine.ActiveLayer(d.Handle)); RefreshAll(); } });
+    public ICommand CmdMaskDel => Cmd("CmdMaskDel", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_mask_delete(d.Handle, Engine.ActiveLayer(d.Handle)); RefreshAll(); } });
+    public ICommand CmdMergeDown => Cmd("CmdMergeDown", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_merge_down(d.Handle, Engine.ActiveLayer(d.Handle)); RefreshAll(); } });
+    public ICommand CmdLayerUp => Cmd("CmdLayerUp", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_move_up(d.Handle, Engine.ActiveLayer(d.Handle)); RefreshAll(); } });
+    public ICommand CmdLayerDown => Cmd("CmdLayerDown", () => { var d = Doc(); if (d != null) { Engine.aurora_layer_move_down(d.Handle, Engine.ActiveLayer(d.Handle)); RefreshAll(); } });
 
     public ICommand CmdSelAll => Cmd("CmdSelAll", () => { var d = Doc(); if (d != null) { Engine.aurora_select_all(d.Handle); TheCanvas.InvalidateAnts(); } });
     public ICommand CmdSelNone => Cmd("CmdSelNone", () => { var d = Doc(); if (d != null) { Engine.aurora_select_none(d.Handle); TheCanvas.InvalidateAnts(); } });
@@ -448,11 +448,10 @@ public partial class MainWindow : Window
     private void SwitchDisplay(AuroraDocument doc)
     {
         _displayOverride = doc;
-        OnImageStructureChanged();
-        TheCanvas.InvalidateAnts();
+        // reset canvas view state so the preview document is polled + fitted
+        TheCanvas.ResetForDocSwitch();
+        UpdateStatus();
     }
-
-    private AuroraDocument? _displayOverride;
 
     // ══════════ workspace & panels ══════════
 
@@ -461,6 +460,14 @@ public partial class MainWindow : Window
         ColorPanelCtl.IsVisible = color;
         LayersPanelCtl.IsVisible = layers;
         HistoryPanelCtl.IsVisible = history;
+        var s = AuroraStudio.App.Settings;
+        if (s != null)
+        {
+            s.ShowColorPanel = color;
+            s.ShowLayersPanel = layers;
+            s.ShowHistoryPanel = history;
+            s.Save();
+        }
         SetStatusMessage("Workspace updated");
     }
 
@@ -532,6 +539,8 @@ public partial class MainWindow : Window
                 Key.T => ToolKind.Text,
                 Key.U => ToolKind.Shape,
                 Key.C => ToolKind.Crop,
+                Key.H => ToolKind.Hand,
+                Key.Z => ToolKind.Zoom,
                 _ => null,
             };
             if (t != null)
@@ -589,7 +598,21 @@ public class RelayCommand : System.Windows.Input.ICommand
     public RelayCommand(Action a) => _action = a;
     public event EventHandler? CanExecuteChanged;
     public bool CanExecute(object? parameter) => true;
-    public void Execute(object? parameter) => _action();
+    public void Execute(object? parameter)
+    {
+        try
+        {
+            _action();
+        }
+        catch (Exception ex)
+        {
+            // log + status message; the Dispatcher shield will also show a dialog.
+            Program.WriteCrash("COMMAND", ex);
+            if (AuroraStudio.App.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime lf
+                && lf.MainWindow is MainWindow mw)
+                mw.SetStatusMessage("Command failed: " + ex.Message);
+        }
+    }
 }
 
 public static class EngineLocalFormat

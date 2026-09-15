@@ -7,3 +7,4 @@ app/aurora_engine.so
 *.user
 .vs/
 crash.log
+.avalonia-build-tasks/

@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Avalonia;
 using Project = Avalonia.Platform;
 
@@ -18,25 +19,38 @@ internal static class Program
             return;
         }
 
-        // Global startup crash capture — writes a crash log next to settings instead of dying silently.
+        // ---- global crash capture: log every unhandled exception instead of dying silently ----
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            WriteCrash("APPDOMAIN", e.ExceptionObject as Exception ?? new Exception(e.ExceptionObject?.ToString()));
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            WriteCrash("TASK", e.Exception);
+            e.SetObserved();
+        };
+
         try
         {
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
         catch (Exception ex)
         {
-            try
-            {
-                string dir = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AuroraStudio");
-                System.IO.Directory.CreateDirectory(dir);
-                System.IO.File.AppendAllText(System.IO.Path.Combine(dir, "crash.log"),
-                    DateTime.Now + " STARTUP FATAL: " + ex + Environment.NewLine);
-                Console.Error.WriteLine(ex);
-            }
-            catch { }
+            WriteCrash("STARTUP", ex);
             throw;
         }
+    }
+
+    internal static void WriteCrash(string kind, Exception ex)
+    {
+        try
+        {
+            string dir = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AuroraStudio");
+            System.IO.Directory.CreateDirectory(dir);
+            System.IO.File.AppendAllText(System.IO.Path.Combine(dir, "crash.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {kind}: {ex}{Environment.NewLine}---{Environment.NewLine}");
+        }
+        catch { }
+        try { Console.Error.WriteLine($"[aurora:{kind}] {ex}"); } catch { }
     }
 
     public static AppBuilder BuildAvaloniaApp()
