@@ -96,6 +96,8 @@ public partial class MainWindow : Window
     public Panels.ColorPanel ColorPanelCtl { get; private set; } = null!;
     public Panels.LayersPanel LayersPanelCtl { get; private set; } = null!;
     public Panels.HistoryPanel HistoryPanelCtl { get; private set; } = null!;
+    public Panels.HistogramPanel HistogramPanelCtl { get; private set; } = null!;
+    public Panels.NavigatorPanel NavigatorPanelCtl { get; private set; } = null!;
 
     private readonly DispatcherTimer _pollTimer;
     private AppSettings _settings = AppSettings.Load();
@@ -112,13 +114,35 @@ public partial class MainWindow : Window
         ColorPanelCtl = new Panels.ColorPanel(this);
         LayersPanelCtl = new Panels.LayersPanel(this);
         HistoryPanelCtl = new Panels.HistoryPanel(this);
+        HistogramPanelCtl = new Panels.HistogramPanel(this);
+        NavigatorPanelCtl = new Panels.NavigatorPanel(this);
         var colorHost = FindAny<ContentControl>("ColorPanelHost");
         var layersHost = FindAny<ContentControl>("LayersPanelHost");
         var historyHost = FindAny<ContentControl>("HistoryPanelHost");
-        System.Console.Error.WriteLine($"[aurora] hosts: color={colorHost != null} layers={layersHost != null} history={historyHost != null}");
+        var histogramHost = FindAny<ContentControl>("HistogramPanelHost");
+        var navigatorHost = FindAny<ContentControl>("NavigatorPanelHost");
+        System.Console.Error.WriteLine($"[aurora] hosts: color={colorHost != null} layers={layersHost != null} history={historyHost != null} histogram={histogramHost != null} navigator={navigatorHost != null}");
         if (colorHost != null) colorHost.Content = ColorPanelCtl;
         if (layersHost != null) layersHost.Content = LayersPanelCtl;
         if (historyHost != null) historyHost.Content = HistoryPanelCtl;
+        if (histogramHost != null) histogramHost.Content = HistogramPanelCtl;
+        if (navigatorHost != null) navigatorHost.Content = NavigatorPanelCtl;
+
+        // drag & drop image files onto the window to open them
+        AddHandler(DragDrop.DragOverEvent, (_, e) =>
+        {
+            e.DragEffects = DragDropEffects.Copy;
+            e.Handled = true;
+        }, RoutingStrategies.Bubble);
+        AddHandler(DragDrop.DropEvent, (_, e) =>
+        {
+            try
+            {
+                foreach (var f in e.Data?.GetFiles() ?? Array.Empty<IStorageFile>())
+                    OpenImagePath(f.Path.LocalPath);
+            }
+            catch (Exception ex) { Program.WriteCrash("DROP", ex); }
+        }, RoutingStrategies.Bubble);
 
         _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
         _pollTimer.Tick += (_, _) => TheCanvas.PollComposite();
@@ -146,6 +170,7 @@ public partial class MainWindow : Window
             if (el != null) el.Text = Interop.Engine.Version();
             CreateInitialDocument();
             UpdateStatus();
+            BuildRecentMenu();
 
             // CI/demo automation (real operations, real UI state)
             var args = Environment.GetCommandLineArgs();
@@ -205,6 +230,8 @@ public partial class MainWindow : Window
                 LayersPanelCtl.IsVisible = s.ShowLayersPanel;
                 ColorPanelCtl.IsVisible = s.ShowColorPanel;
                 HistoryPanelCtl.IsVisible = s.ShowHistoryPanel;
+                HistogramPanelCtl.IsVisible = s.ShowHistogramPanel;
+                NavigatorPanelCtl.IsVisible = s.ShowNavigatorPanel;
             }
         }
         catch (Exception ex)
@@ -235,12 +262,47 @@ public partial class MainWindow : Window
         return null;
     }
 
-    private T? FindAny<T>(string name) where T : Avalonia.Controls.Control => FindAny(name) as T;
+    public T? FindAny<T>(string name) where T : Avalonia.Controls.Control => FindAny(name) as T;
 
     private void CreateInitialDocument()
     {
         var doc = NewDocumentInternal(1200, 800, 1, "Untitled-1");
         SelectDoc(doc);
+    }
+
+    /// <summary>Populate File → Open Recent from persisted settings (real entries, really open).</summary>
+    public void BuildRecentMenu()
+    {
+        try
+        {
+            var mnu = FindAny<MenuItem>("MnuRecent");
+            if (mnu == null) return;
+            var items = new List<object>();
+            foreach (var p in RecentFiles)
+            {
+                if (!File.Exists(p)) continue;
+                var path = p;
+                items.Add(new MenuItem
+                {
+                    Header = System.IO.Path.GetFileName(path),
+                    Tag = path,
+                });
+            }
+            var last = items.LastOrDefault();
+            if (items.Count == 0)
+            {
+                mnu.ItemsSource = new[] { new MenuItem { Header = "(no recent files)", IsEnabled = false } };
+                return;
+            }
+            // wire clicks then assign
+            foreach (var it in items)
+                if (it is MenuItem mi) mi.Click += (_, _) => OpenImagePath((string)mi.Tag!);
+            mnu.ItemsSource = items;
+        }
+        catch (Exception ex)
+        {
+            Program.WriteCrash("RECENT", ex);
+        }
     }
 
     // ══════════ tool palette ══════════
@@ -545,6 +607,8 @@ public partial class MainWindow : Window
         LayersPanelCtl.Refresh(doc);
         HistoryPanelCtl.Refresh(doc);
         ColorPanelCtl.RefreshExternal();
+        HistogramPanelCtl.Refresh(doc);
+        NavigatorPanelCtl.Refresh(doc);
     }
 
     public void OnImageStructureChanged()
@@ -570,33 +634,53 @@ public partial class MainWindow : Window
     private Point _textScreenPos;
     private Point _textDocPos;
 
+    /// <summary>Overlay canvas for the text editor — resolved via the visual tree
+    /// (never rely on XAML-generated fields: they stay null with the runtime loader).</summary>
+    public Panel? TheCanvasOverlay => _canvasOverlayEl ??= FindAny<Panel>("CanvasOverlay");
+    private Panel? _canvasOverlayEl;
+
     public void ShowTextEditorAt(Point screenPos, Point docPos)
     {
-        HideTextEditor(commit: false);
-        _textScreenPos = screenPos;
-        _textDocPos = docPos;
-        _textOverlay = new TextBox
+        try
         {
-            Width = 320,
-            Watermark = "Type text, press Ctrl+Enter to commit, Esc to cancel",
-            AcceptsReturn = true,
-            Height = 84,
-            FontSize = 14,
-            Background = new SolidColorBrush(Color.FromArgb(240, 0x26, 0x28, 0x2C)),
-        };
-        CanvasOverlay.Children.Add(_textOverlay);
-        Avalonia.Controls.Canvas.SetLeft(_textOverlay, screenPos.X);
-        Avalonia.Controls.Canvas.SetTop(_textOverlay, screenPos.Y);
-        _textOverlay.KeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Escape) { HideTextEditor(commit: false); e.Handled = true; }
-            else if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            HideTextEditor(commit: false);
+            var overlay = TheCanvasOverlay;
+            if (overlay == null)
             {
-                CommitText();
-                e.Handled = true;
+                Program.WriteCrash("TEXT", new Exception("CanvasOverlay not found in visual tree"));
+                SetStatusMessage("Text editor unavailable (overlay missing)");
+                return;
             }
-        };
-        _textOverlay.Focus();
+            _textScreenPos = screenPos;
+            _textDocPos = docPos;
+            _textOverlay = new TextBox
+            {
+                Width = 320,
+                Watermark = "Type text, press Ctrl+Enter to commit, Esc to cancel",
+                AcceptsReturn = true,
+                Height = 84,
+                FontSize = 14,
+                Background = new SolidColorBrush(Color.FromArgb(240, 0x26, 0x28, 0x2C)),
+            };
+            overlay.Children.Add(_textOverlay);
+            Avalonia.Controls.Canvas.SetLeft(_textOverlay, screenPos.X);
+            Avalonia.Controls.Canvas.SetTop(_textOverlay, screenPos.Y);
+            _textOverlay.KeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Escape) { HideTextEditor(commit: false); e.Handled = true; }
+                else if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+                {
+                    CommitText();
+                    e.Handled = true;
+                }
+            };
+            _textOverlay.Focus();
+        }
+        catch (Exception ex)
+        {
+            Program.WriteCrash("TEXT", ex);
+            SetStatusMessage("Text tool error: " + ex.Message);
+        }
     }
 
     private void CommitText()
@@ -609,12 +693,19 @@ public partial class MainWindow : Window
         HideTextEditor(true);
     }
 
-    private void HideTextEditor(bool commit)
+    public void HideTextEditor(bool commit)
     {
-        if (_textOverlay != null)
+        try
         {
-            CanvasOverlay.Children.Remove(_textOverlay);
-            _textOverlay = null;
+            if (_textOverlay != null)
+            {
+                TheCanvasOverlay?.Children.Remove(_textOverlay);
+                _textOverlay = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Program.WriteCrash("TEXT", ex);
         }
     }
 

@@ -1741,6 +1741,258 @@ pub extern "C" fn aurora_filter_emboss(h: u64) -> i32 {
     .unwrap_or(-1)
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// v3.0: professional adjustments & effects — FFI surface
+// ══════════════════════════════════════════════════════════════════════
+
+/// Commit a pixel op returned by filters/adjust (selection-aware, undo-integrated).
+fn commit_pixop(doc: &mut Document, layer_id: u64, result: Option<(Rect, Vec<u8>, Vec<u8>)>, label: &str) -> i32 {
+    match result {
+        Some((rect, before, after)) => {
+            doc.history.push(undo::Command::Pixels { layer_id, rect, before, after, label: label.into() });
+            doc.process_dirty();
+            0
+        }
+        None => {
+            set_err(format!("{}: nothing to apply (empty layer or selection)", label));
+            -1
+        }
+    }
+}
+
+fn apply_f<F>(h: u64, label: &str, f: F) -> i32
+where
+    F: FnOnce(&mut Document) -> Option<(Rect, Vec<u8>, Vec<u8>)>,
+{
+    guard(move || {
+        let d = get_doc(h);
+        let mut doc = d.lock().unwrap();
+        let layer_id = doc.active_id;
+        let result = f(&mut doc);
+        commit_pixop(&mut doc, layer_id, result, label)
+    })
+    .unwrap_or(-1)
+}
+
+// ---------- new adjustments ----------
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_exposure(h: u64, stops: f32, gamma: f32) -> i32 {
+    apply_f(h, "Exposure", |doc| adjust::exposure_gamma(doc, stops, gamma))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_vibrance(h: u64, amount: i32) -> i32 {
+    apply_f(h, "Vibrance", |doc| adjust::vibrance(doc, amount))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_white_balance(h: u64, temperature: i32, tint: i32) -> i32 {
+    apply_f(h, "White Balance", |doc| adjust::white_balance(doc, temperature, tint))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_shadows_highlights(h: u64, shadows: i32, highlights: i32) -> i32 {
+    apply_f(h, "Shadows/Highlights", |doc| adjust::shadows_highlights(doc, shadows, highlights))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_color_balance(h: u64, cr: i32, mg: i32, yb: i32) -> i32 {
+    apply_f(h, "Color Balance", |doc| adjust::color_balance(doc, cr, mg, yb))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_black_white(h: u64, rw: i32, gw: i32, bw: i32) -> i32 {
+    apply_f(h, "Black & White", |doc| adjust::black_white(doc, rw, gw, bw))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_desaturate(h: u64) -> i32 {
+    apply_f(h, "Desaturate", |doc| adjust::desaturate(doc))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_invert(h: u64) -> i32 {
+    apply_f(h, "Invert", |doc| adjust::invert(doc))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_threshold(h: u64, level: i32) -> i32 {
+    apply_f(h, "Threshold", |doc| adjust::threshold(doc, level))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_posterize(h: u64, levels: i32) -> i32 {
+    apply_f(h, "Posterize", |doc| adjust::posterize(doc, levels))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_photo_filter(h: u64, tr: u8, tg: u8, tb: u8, density: i32, preserve: i32) -> i32 {
+    apply_f(h, "Photo Filter", |doc| adjust::photo_filter(doc, tr, tg, tb, density, preserve != 0))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_gradient_map(h: u64, r0: u8, g0: u8, b0: u8, r1: u8, g1: u8, b1: u8) -> i32 {
+    apply_f(h, "Gradient Map", |doc| adjust::gradient_map(doc, r0, g0, b0, r1, g1, b1))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_auto_tone(h: u64) -> i32 {
+    apply_f(h, "Auto Tone", |doc| adjust::auto_tone(doc))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_auto_contrast(h: u64) -> i32 {
+    apply_f(h, "Auto Contrast", |doc| adjust::auto_contrast(doc))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_auto_color(h: u64) -> i32 {
+    apply_f(h, "Auto Color", |doc| adjust::auto_color(doc))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_adj_clarity(h: u64, amount: i32) -> i32 {
+    apply_f(h, "Clarity", |doc| adjust::clarity(doc, amount))
+}
+
+// ---------- new effects ----------
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_box_blur(h: u64, radius: i32) -> i32 {
+    apply_f(h, "Box Blur", |doc| filters::box_blur(doc, radius))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_motion_blur(h: u64, length: i32, angle: f32) -> i32 {
+    apply_f(h, "Motion Blur", |doc| filters::motion_blur(doc, length, angle))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_zoom_blur(h: u64, amount: i32) -> i32 {
+    apply_f(h, "Zoom Blur", |doc| filters::zoom_blur(doc, amount))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_unsharp(h: u64, radius: f32, strength: f32, threshold: i32) -> i32 {
+    apply_f(h, "Unsharp Mask", |doc| filters::unsharp_mask(doc, radius, strength, threshold))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_find_edges(h: u64, invert: i32) -> i32 {
+    apply_f(h, "Find Edges", |doc| filters::find_edges(doc, invert != 0))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_oil_paint(h: u64, radius: i32) -> i32 {
+    apply_f(h, "Oil Paint", |doc| filters::oil_paint(doc, radius))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_halftone(h: u64, cell: i32) -> i32 {
+    apply_f(h, "Halftone", |doc| filters::halftone(doc, cell))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_charcoal(h: u64, detail: i32) -> i32 {
+    apply_f(h, "Charcoal", |doc| filters::charcoal(doc, detail))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_pencil(h: u64, strength: i32) -> i32 {
+    apply_f(h, "Pencil Sketch", |doc| filters::pencil_sketch(doc, strength))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_median(h: u64) -> i32 {
+    apply_f(h, "Noise Reduction", |doc| filters::median_denoise(doc))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_vignette(h: u64, amount: i32, roundness: i32) -> i32 {
+    apply_f(h, "Vignette", |doc| filters::vignette(doc, amount, roundness))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_bloom(h: u64, radius: f32, intensity: i32) -> i32 {
+    apply_f(h, "Bloom", |doc| filters::bloom(doc, radius, intensity))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_grain(h: u64, amount: i32, size: i32) -> i32 {
+    apply_f(h, "Film Grain", |doc| filters::film_grain(doc, amount, size))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_scanlines(h: u64, spacing: i32, intensity: i32) -> i32 {
+    apply_f(h, "Scanlines", |doc| filters::scanlines(doc, spacing, intensity))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_glitch(h: u64, strength: i32) -> i32 {
+    apply_f(h, "Glitch", |doc| filters::glitch(doc, strength))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_chromatic(h: u64, amount: i32) -> i32 {
+    apply_f(h, "Chromatic Aberration", |doc| filters::chromatic_aberration(doc, amount))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_duotone(h: u64, sr: u8, sg: u8, sb: u8, hr: u8, hg: u8, hb: u8) -> i32 {
+    apply_f(h, "Duotone", |doc| filters::duotone(doc, sr, sg, sb, hr, hg, hb))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_ripple(h: u64, amplitude: f32, wavelength: f32, cx: f32, cy: f32) -> i32 {
+    apply_f(h, "Ripple", |doc| filters::ripple(doc, amplitude, wavelength, cx, cy))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_pinch(h: u64, amount: i32, cx: f32, cy: f32, radius: f32) -> i32 {
+    apply_f(h, "Pinch", |doc| filters::pinch(doc, amount, cx, cy, radius))
+}
+
+#[no_mangle]
+pub extern "C" fn aurora_filter_clouds(h: u64, scale: f32, seed: u32, opacity: i32) -> i32 {
+    apply_f(h, "Clouds", |doc| filters::clouds(doc, scale, seed, opacity))
+}
+
+/// Luminance histogram of the flattened composite (or selection region).
+/// Writes 256 bins; returns needed byte count (256) or negative on error.
+#[no_mangle]
+pub extern "C" fn aurora_histogram(h: u64, buf: *mut u8, cap: u32) -> i32 {
+    guard(|| {
+        if buf.is_null() || (cap as usize) < 256 {
+            set_err("histogram buffer too small");
+            return -1;
+        }
+        let d = get_doc(h);
+        let doc = d.lock().unwrap();
+        let region = doc.selection.bounds().unwrap_or(Rect::new(0, 0, doc.w, doc.h)).clip_to(doc.w, doc.h);
+        let mut bins = [0u32; 256];
+        // composite already accounts for visibility/opacity/blend
+        let comp = doc.composite_image();
+        for y in region.y..region.bottom() {
+            for x in region.x..region.right() {
+                let px = comp.get(x, y);
+                if px[3] == 0 { continue; }
+                let lum = (0.2126 * px[0] as f32 + 0.7152 * px[1] as f32 + 0.0722 * px[2] as f32) as usize;
+                bins[lum.min(255)] += 1;
+            }
+        }
+        let max = bins.iter().copied().max().unwrap_or(1).max(1) as f32;
+        let out = unsafe { std::slice::from_raw_parts_mut(buf, 256) };
+        for (i, b) in bins.iter().enumerate() {
+            // normalize to 0..255 for compact transport; C# can rescale
+            let v = (*b as f32 / max * 255.0) as u8;
+            out[i] = if *b > 0 { v.max(2) } else { 0 };
+        }
+        256
+    })
+    .unwrap_or(-1)
+}
+
 // ===================== undo =====================
 
 #[no_mangle]
@@ -2128,4 +2380,97 @@ pub extern "C" fn aurora_selftest() -> i32 {
         0
     })
     .unwrap_or(-99)
+}
+
+/// v3.0 exhaustive ops audit: every new adjustment & effect must run without
+/// error on a real document and remain undoable. Returns 0 on success.
+#[no_mangle]
+pub extern "C" fn aurora_ops_audit() -> i32 {
+    guard(|| {
+        let h = aurora_doc_new(96, 96, 2, c"audit".as_ptr());
+        if h == 0 { set_err("audit: doc_new failed"); return -1; }
+        let layer = aurora_layer_add(h, -1, c"L".as_ptr(), 0);
+        // paint a base image so ops have real data to chew on:
+        // a brush stroke + a full-canvas gradient guarantees a wide tonal range
+        let bp = BrushFFI { size: 24.0, hardness: 0.9, flow: 1.0, opacity: 1.0, spacing: 0.1, eraser: 0, r: 90, g: 140, b: 220, a: 255, size_pressure: 0, opacity_pressure: 0, pencil: 0 };
+        if aurora_brush_begin(h, layer, &bp, 10.0, 40.0, 1.0) != 0 { set_err("audit: brush_begin"); return -2; }
+        for i in 0..40 { let _ = aurora_brush_move(h, 10.0 + i as f32, 40.0 + (i as f32 * 0.7).sin() * 12.0, 1.0); }
+        let _ = aurora_brush_end(h);
+        let _ = aurora_gradient(h, 0.0, 0.0, 96.0, 96.0, 0, 0, 245, 240, 230, 255, 15, 18, 30, 255, 0);
+
+        // (fn pointer, name) pairs — each must return 0
+        type Op = (fn(u64) -> i32, &'static str);
+        let ops: Vec<Op> = vec![
+            (|h| aurora_adj_exposure(h, 0.3, 1.1), "exposure"),
+            (|h| aurora_adj_vibrance(h, 40), "vibrance"),
+            (|h| aurora_adj_white_balance(h, 25, -10), "white_balance"),
+            (|h| aurora_adj_shadows_highlights(h, 35, -20), "shadows_highlights"),
+            (|h| aurora_adj_color_balance(h, 10, -5, 8), "color_balance"),
+            (|h| aurora_adj_black_white(h, 20, 0, -10), "black_white"),
+            (|h| aurora_adj_desaturate(h), "desaturate"),
+            (|h| aurora_adj_invert(h), "invert"),
+            (|h| aurora_adj_threshold(h, 128), "threshold"),
+            (|h| aurora_adj_posterize(h, 6), "posterize"),
+            (|h| aurora_adj_photo_filter(h, 255, 160, 60, 35, 1), "photo_filter"),
+            (|h| aurora_adj_gradient_map(h, 20, 10, 60, 250, 240, 200), "gradient_map"),
+            (|h| aurora_adj_auto_tone(h), "auto_tone"),
+            (|h| aurora_adj_auto_contrast(h), "auto_contrast"),
+            (|h| aurora_adj_auto_color(h), "auto_color"),
+            (|h| aurora_adj_clarity(h, 30), "clarity"),
+            (|h| aurora_filter_box_blur(h, 4), "box_blur"),
+            (|h| aurora_filter_motion_blur(h, 12, 30.0), "motion_blur"),
+            (|h| aurora_filter_zoom_blur(h, 25), "zoom_blur"),
+            (|h| aurora_filter_unsharp(h, 3.0, 1.2, 4), "unsharp"),
+            (|h| aurora_filter_find_edges(h, 0), "find_edges"),
+            (|h| aurora_filter_oil_paint(h, 3), "oil_paint"),
+            (|h| aurora_filter_halftone(h, 8), "halftone"),
+            (|h| aurora_filter_charcoal(h, 6), "charcoal"),
+            (|h| aurora_filter_pencil(h, 6), "pencil"),
+            (|h| aurora_filter_median(h), "median"),
+            (|h| aurora_filter_vignette(h, 60, 50), "vignette"),
+            (|h| aurora_filter_bloom(h, 8.0, 40), "bloom"),
+            (|h| aurora_filter_grain(h, 30, 2), "grain"),
+            (|h| aurora_filter_scanlines(h, 6, 50), "scanlines"),
+            (|h| aurora_filter_glitch(h, 20), "glitch"),
+            (|h| aurora_filter_chromatic(h, 30), "chromatic"),
+            (|h| aurora_filter_duotone(h, 30, 20, 80, 250, 230, 180), "duotone"),
+            (|h| aurora_filter_ripple(h, 8.0, 40.0, -1.0, -1.0), "ripple"),
+            (|h| aurora_filter_pinch(h, 40, -1.0, -1.0, 0.0), "pinch"),
+            (|h| aurora_filter_clouds(h, 8.0, 42, 60), "clouds"),
+            (|h| hist_ok(h), "histogram"),
+        ];
+        for (op, name) in ops {
+            // undo to a common base between ops so each sees real content
+            if op(h) != 0 {
+                set_err(format!("audit: {} failed: {}", name, take_err()));
+                return -3;
+            }
+            // undo the op so the next one also has content (first op needs content too)
+            if aurora_undo(h) != 0 {
+                set_err(format!("audit: {} undo failed", name));
+                return -4;
+            }
+        }
+        // histogram sanity: needs at least one non-zero bin
+        unsafe {
+            let mut buf = [0u8; 256];
+            if aurora_histogram(h, buf.as_mut_ptr(), 256) != 256 {
+                set_err("audit: histogram call failed");
+                return -5;
+            }
+            if buf.iter().all(|&b| b == 0) {
+                set_err("audit: histogram all-zero");
+                return -6;
+            }
+        }
+        aurora_doc_free(h);
+        0
+    })
+    .unwrap_or(-99)
+}
+
+fn hist_ok(h: u64) -> i32 {
+    let mut buf = [0u8; 256];
+    let rc = unsafe { aurora_histogram(h, buf.as_mut_ptr(), 256) };
+    if rc == 256 { 0 } else { -1 }
 }

@@ -73,6 +73,48 @@ public partial class MainWindow : Window
         (h, v) => Engine.aurora_filter_wave(h, (float)v[0], (float)v[1], 0)));
     public ICommand CmdFEmboss => Cmd("CmdFEmboss", () => ApplySimple("Emboss", h => Engine.aurora_filter_emboss(h)));
 
+    // ───── v3.0 filter menu ─────
+    public ICommand CmdFBoxBlur => Cmd("CmdFBoxBlur", () => RunFilterDialog("Box Blur", new[] { ("Radius", 1.0, 100.0, 6.0) },
+        (h, v) => Engine.aurora_filter_box_blur(h, (int)v[0])));
+    public ICommand CmdFMotionBlur => Cmd("CmdFMotionBlur", () => RunFilterDialog("Motion Blur", new[] { ("Length", 1.0, 400.0, 24.0), ("Angle °", 0.0, 360.0, 0.0) },
+        (h, v) => Engine.aurora_filter_motion_blur(h, (int)v[0], (float)v[1])));
+    public ICommand CmdFZoomBlur => Cmd("CmdFZoomBlur", () => RunFilterDialog("Zoom Blur", new[] { ("Amount", 1.0, 100.0, 30.0) },
+        (h, v) => Engine.aurora_filter_zoom_blur(h, (int)v[0])));
+    public ICommand CmdFUnsharp => Cmd("CmdFUnsharp", () => RunFilterDialog("Unsharp Mask", new[] { ("Radius", 0.1, 60.0, 2.0), ("Strength", 0.0, 5.0, 1.0), ("Threshold", 0.0, 128.0, 3.0) },
+        (h, v) => Engine.aurora_filter_unsharp(h, (float)v[0], (float)v[1], (int)v[2])));
+    public ICommand CmdFClarity => Cmd("CmdFClarity", () => RunFilterDialog("Clarity (local contrast)", new[] { ("Amount", -100.0, 100.0, 30.0) },
+        (h, v) => Engine.aurora_adj_clarity(h, (int)v[0])));
+    public ICommand CmdFMedian => Cmd("CmdFMedian", () => ApplySimple("Noise Reduction", h => Engine.aurora_filter_median(h)));
+    public ICommand CmdFFindEdges => Cmd("CmdFFindEdges", () => ApplySimple("Find Edges", h => Engine.aurora_filter_find_edges(h, 0)));
+    public ICommand CmdFOilPaint => Cmd("CmdFOilPaint", () => RunFilterDialog("Oil Paint", new[] { ("Brush radius", 1.0, 10.0, 3.0) },
+        (h, v) => Engine.aurora_filter_oil_paint(h, (int)v[0])));
+    public ICommand CmdFHalftone => Cmd("CmdFHalftone", () => RunFilterDialog("Halftone", new[] { ("Cell size", 3.0, 64.0, 10.0) },
+        (h, v) => Engine.aurora_filter_halftone(h, (int)v[0])));
+    public ICommand CmdFCharcoal => Cmd("CmdFCharcoal", () => RunFilterDialog("Charcoal", new[] { ("Detail", 1.0, 20.0, 6.0) },
+        (h, v) => Engine.aurora_filter_charcoal(h, (int)v[0])));
+    public ICommand CmdFPencil => Cmd("CmdFPencil", () => RunFilterDialog("Pencil Sketch", new[] { ("Strength", 1.0, 20.0, 6.0) },
+        (h, v) => Engine.aurora_filter_pencil(h, (int)v[0])));
+    public ICommand CmdFVignette => Cmd("CmdFVignette", () => RunFilterDialog("Vignette", new[] { ("Amount", -100.0, 100.0, 55.0), ("Roundness", 0.0, 100.0, 50.0) },
+        (h, v) => Engine.aurora_filter_vignette(h, (int)v[0], (int)v[1])));
+    public ICommand CmdFBloom => Cmd("CmdFBloom", () => RunFilterDialog("Bloom / Glow", new[] { ("Radius", 1.0, 80.0, 12.0), ("Intensity", 0.0, 100.0, 45.0) },
+        (h, v) => Engine.aurora_filter_bloom(h, (float)v[0], (int)v[1])));
+    public ICommand CmdFGrain => Cmd("CmdFGrain", () => RunFilterDialog("Film Grain", new[] { ("Amount", 0.0, 100.0, 25.0), ("Grain size", 1.0, 8.0, 2.0) },
+        (h, v) => Engine.aurora_filter_grain(h, (int)v[0], (int)v[1])));
+    public ICommand CmdFScanlines => Cmd("CmdFScanlines", () => RunFilterDialog("Scanlines (CRT)", new[] { ("Spacing", 2.0, 32.0, 6.0), ("Intensity", 0.0, 100.0, 50.0) },
+        (h, v) => Engine.aurora_filter_scanlines(h, (int)v[0], (int)v[1])));
+    public ICommand CmdFGlitch => Cmd("CmdFGlitch", () => RunFilterDialog("Glitch", new[] { ("Strength", 1.0, 100.0, 25.0) },
+        (h, v) => Engine.aurora_filter_glitch(h, (int)v[0])));
+    public ICommand CmdFChromatic => Cmd("CmdFChromatic", () => RunFilterDialog("Chromatic Aberration", new[] { ("Amount", 0.0, 100.0, 35.0) },
+        (h, v) => Engine.aurora_filter_chromatic(h, (int)v[0])));
+    public ICommand CmdFDuotone => Cmd("CmdFDuotone", () => DoDuotone());
+    public ICommand CmdFRipple => Cmd("CmdFRipple", () => RunFilterDialogCentered("Ripple", new[] { ("Amplitude", 1.0, 200.0, 10.0), ("Wavelength", 4.0, 500.0, 60.0) },
+        (h, v, cx, cy) => Engine.aurora_filter_ripple(h, (float)v[0], (float)v[1], (float)cx, (float)cy)));
+    public ICommand CmdFPinch => Cmd("CmdFPinch", () => RunFilterDialogCentered("Pinch / Bulge", new[] { ("Amount (-in +out)", -100.0, 100.0, 45.0), ("Radius", 10.0, 4000.0, 0.0) },
+        (h, v, cx, cy) => Engine.aurora_filter_pinch(h, (int)v[0], (float)cx, (float)cy, (float)v[1])));
+    public ICommand CmdFClouds => Cmd("CmdFClouds", () => RunFilterDialog("Render Clouds", new[] { ("Scale", 0.5, 64.0, 12.0), ("Opacity", 1.0, 100.0, 70.0) },
+        (h, v) => Engine.aurora_filter_clouds(h, (float)v[0], 42, (int)v[1])));
+
+    // ───── v3.0 adjustments menu ─────
     public ICommand CmdAdjBC => Cmd("CmdAdjBC", () => RunFilterDialog("Brightness / Contrast", new[]
     {
         ("Brightness", -100.0, 100.0, 0.0), ("Contrast", -100.0, 100.0, 0.0),
@@ -81,6 +123,31 @@ public partial class MainWindow : Window
     {
         ("Hue", -180.0, 180.0, 0.0), ("Saturation", -100.0, 100.0, 0.0), ("Lightness", -100.0, 100.0, 0.0),
     }, (h, v) => Engine.aurora_adj_hsl(h, (float)v[0], (float)v[1], (float)v[2])));
+    public ICommand CmdAdjExposure => Cmd("CmdAdjExposure", () => RunFilterDialog("Exposure", new[] { ("Stops", -4.0, 4.0, 0.0), ("Gamma", 0.1, 4.0, 1.0) },
+        (h, v) => Engine.aurora_adj_exposure(h, (float)v[0], (float)v[1])));
+    public ICommand CmdAdjVibrance => Cmd("CmdAdjVibrance", () => RunFilterDialog("Vibrance", new[] { ("Amount", -100.0, 100.0, 35.0) },
+        (h, v) => Engine.aurora_adj_vibrance(h, (int)v[0])));
+    public ICommand CmdAdjWhiteBalance => Cmd("CmdAdjWhiteBalance", () => RunFilterDialog("White Balance", new[] { ("Temperature (-cool +warm)", -100.0, 100.0, 0.0), ("Tint (-green +magenta)", -100.0, 100.0, 0.0) },
+        (h, v) => Engine.aurora_adj_white_balance(h, (int)v[0], (int)v[1])));
+    public ICommand CmdAdjShadowsHi => Cmd("CmdAdjShadowsHi", () => RunFilterDialog("Shadows / Highlights", new[] { ("Shadows", -100.0, 100.0, 0.0), ("Highlights", -100.0, 100.0, 0.0) },
+        (h, v) => Engine.aurora_adj_shadows_highlights(h, (int)v[0], (int)v[1])));
+    public ICommand CmdAdjColorBalance => Cmd("CmdAdjColorBalance", () => RunFilterDialog("Color Balance", new[] { ("Cyan-Red", -100.0, 100.0, 0.0), ("Magenta-Green", -100.0, 100.0, 0.0), ("Yellow-Blue", -100.0, 100.0, 0.0) },
+        (h, v) => Engine.aurora_adj_color_balance(h, (int)v[0], (int)v[1], (int)v[2])));
+    public ICommand CmdAdjBW => Cmd("CmdAdjBW", () => RunFilterDialog("Black & White", new[] { ("Red weight", -100.0, 100.0, 0.0), ("Green weight", -100.0, 100.0, 0.0), ("Blue weight", -100.0, 100.0, 0.0) },
+        (h, v) => Engine.aurora_adj_black_white(h, (int)v[0], (int)v[1], (int)v[2])));
+    public ICommand CmdAdjPhotoFilter => Cmd("CmdAdjPhotoFilter", () => DoPhotoFilter());
+    public ICommand CmdAdjGradientMap => Cmd("CmdAdjGradientMap", () => DoGradientMap());
+    public ICommand CmdAdjThreshold => Cmd("CmdAdjThreshold", () => RunFilterDialog("Threshold", new[] { ("Level", 0.0, 255.0, 128.0) },
+        (h, v) => Engine.aurora_adj_threshold(h, (int)v[0])));
+    public ICommand CmdAdjPosterize => Cmd("CmdAdjPosterize", () => RunFilterDialog("Posterize", new[] { ("Levels", 2.0, 64.0, 6.0) },
+        (h, v) => Engine.aurora_adj_posterize(h, (int)v[0])));
+    public ICommand CmdAdjInvert => Cmd("CmdAdjInvert", () => ApplySimple("Invert", h => Engine.aurora_adj_invert(h)));
+    public ICommand CmdAdjDesaturate => Cmd("CmdAdjDesaturate", () => ApplySimple("Desaturate", h => Engine.aurora_adj_desaturate(h)));
+    public ICommand CmdAutoTone => Cmd("CmdAutoTone", () => ApplySimple("Auto Tone", h => Engine.aurora_adj_auto_tone(h)));
+    public ICommand CmdAutoContrast => Cmd("CmdAutoContrast", () => ApplySimple("Auto Contrast", h => Engine.aurora_adj_auto_contrast(h)));
+    public ICommand CmdAutoColor => Cmd("CmdAutoColor", () => ApplySimple("Auto Color", h => Engine.aurora_adj_auto_color(h)));
+    public ICommand CmdAutoEnhance => Cmd("CmdAutoEnhance", () => DoAutoEnhance());
+
     public ICommand CmdAdjLevels => Cmd("CmdAdjLevels", () => DoLevels());
     public ICommand CmdAdjCurves => Cmd("CmdAdjCurves", () => DoCurves());
 
@@ -88,18 +155,22 @@ public partial class MainWindow : Window
     public ICommand CmdZoomOut => Cmd("CmdZoomOut", () => TheCanvas.ZoomAt(1 / 1.25, TheCanvas.Bounds.Center));
     public ICommand CmdZoomFit => Cmd("CmdZoomFit", () => TheCanvas.FitOrActual());
     public ICommand CmdZoom100 => Cmd("CmdZoom100", () => TheCanvas.FitOrActual(actual: true));
-    public ICommand CmdWsDefault => Cmd("CmdWsDefault", () => SetWorkspace(true, true, true));
-    public ICommand CmdWsMinimal => Cmd("CmdWsMinimal", () => SetWorkspace(false, false, false));
-    public ICommand CmdWsPainting => Cmd("CmdWsPainting", () => SetWorkspace(true, false, false));
+    public ICommand CmdWsDefault => Cmd("CmdWsDefault", () => SetWorkspace(true, true, true, true, true));
+    public ICommand CmdWsMinimal => Cmd("CmdWsMinimal", () => SetWorkspace(false, false, false, false, false));
+    public ICommand CmdWsPainting => Cmd("CmdWsPainting", () => SetWorkspace(true, true, false, false, false));
+    public ICommand CmdWsPhoto => Cmd("CmdWsPhoto", () => SetWorkspace(true, true, true, true, false));
     public ICommand CmdToggleHistory => Cmd("CmdToggleHistory", () => ToggleHistory());
+    public ICommand CmdToggleHistogram => Cmd("CmdToggleHistogram", () => TogglePanel(HistogramPanelCtl, (s, v) => s.ShowHistogramPanel = v));
+    public ICommand CmdToggleNavigator => Cmd("CmdToggleNavigator", () => TogglePanel(NavigatorPanelCtl, (s, v) => s.ShowNavigatorPanel = v));
 
     public ICommand CmdAbout => Cmd("CmdAbout", () => ShowAbout("Aurora Studio",
-        "Aurora Studio 2.0 — professional image editor & digital painting.\n\n" +
+        "Aurora Studio 3.0 — professional image editor & digital painting.\n\n" +
         "Native desktop application (Avalonia UI + Rust engine).\n" +
         "No web technologies, no runtimes to install.\n\n" +
         "Layers · Blend modes · Masks · Pressure-sensitive brushes\n" +
         "Selections (rect / ellipse / lasso / wand, feather & invert)\n" +
-        "Transforms · Filters · Curves & Levels · Full undo history\n" +
+        "Transforms · 28 filters & effects · 16 pro color adjustments\n" +
+        "Curves & Levels · Live Histogram · Navigator · Full undo history\n" +
         "PNG · JPEG · WebP · GIF · BMP · TIFF · SVG · OpenRaster · PSD\n\n" +
         Interop.Engine.Version()));
 
@@ -125,6 +196,44 @@ public partial class MainWindow : Window
     }
 
     // ══════════ file ops ══════════
+
+    /// <summary>Open an image by path (shared by the Open dialog, recent files and drag &amp; drop).</summary>
+    public void OpenImagePath(string path)
+    {
+        try
+        {
+            var handle = Engine.DocOpen(path);
+            if (handle == 0) throw new Exception(Engine.LastError());
+            var doc = new AuroraDocument(handle, 1, 1, Path.GetFileName(path)) { FilePath = path };
+            doc.RefreshState();
+            Tabs.Add(new DocTabItem { Doc = doc });
+            SelectDoc(doc);
+            SetStatusMessage("Opened " + path);
+            AddRecentFile(path);
+        }
+        catch (Exception ex)
+        {
+            Program.WriteCrash("OPEN", ex);
+            ShowError("Open failed", ex.Message);
+        }
+    }
+
+    private void AddRecentFile(string path)
+    {
+        try
+        {
+            var s = AuroraStudio.App.Settings;
+            if (s == null) return;
+            s.RecentFiles.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+            s.RecentFiles.Insert(0, path);
+            if (s.RecentFiles.Count > 10) s.RecentFiles.RemoveRange(10, s.RecentFiles.Count - 10);
+            s.Save();
+        }
+        catch { }
+    }
+
+    public IReadOnlyList<string> RecentFiles =>
+        (AuroraStudio.App.Settings?.RecentFiles ?? new List<string>()).AsReadOnly();
 
     private async void DoNew()
     {
@@ -161,16 +270,7 @@ public partial class MainWindow : Window
         {
             try
             {
-                var handle = Engine.DocOpen(path);
-                if (handle == 0) throw new Exception(Engine.LastError());
-                Dispatcher.UIThread.Post(() =>
-                {
-                    var doc = new AuroraDocument(handle, 1, 1, Path.GetFileName(path)) { FilePath = path };
-                    doc.RefreshState();
-                    Tabs.Add(new DocTabItem { Doc = doc });
-                    SelectDoc(doc);
-                    SetStatusMessage("Opened " + path);
-                });
+                Dispatcher.UIThread.Post(() => OpenImagePath(path));
             }
             catch (Exception ex)
             {
@@ -304,9 +404,10 @@ public partial class MainWindow : Window
         RefreshPanels();
     }
 
-    /// <summary>Filter dialog with live preview: works on a cloned doc handle; commits to the real doc on OK.</summary>
+    /// <summary>Filter dialog with live preview: works on a cloned doc handle; commits to the real doc on OK.
+    /// For parameterless ops pass an empty parameter array and provide `preApply` so the preview clone also updates.</summary>
     private async void RunFilterDialog(string title, (string Name, double Min, double Max, double Val)[] pars,
-        Func<ulong, double[], int> apply)
+        Func<ulong, double[], int> apply, Func<ulong, double[], int>? preApply = null)
     {
         var d = Doc();
         if (d == null) return;
@@ -318,11 +419,12 @@ public partial class MainWindow : Window
         prevDoc.RefreshState();
         SwitchDisplay(prevDoc);
 
+        var pre = preApply ?? apply;
         var dlg = new FilterParamDialog(title, pars, vals =>
         {
             // jump history back to 0 then apply fresh params
             Engine.aurora_history_set(preview, 0);
-            apply(preview, vals);
+            pre(preview, vals);
             prevDoc.RefreshState();
             OnImageStructureChanged();
         });
@@ -453,27 +555,98 @@ public partial class MainWindow : Window
         UpdateStatus();
     }
 
+    // ══════════ v3.0 color dialogs & one-click enhance ══════════
+
+    private async void DoDuotone()
+    {
+        var d = Doc();
+        if (d == null) return;
+        var picker = new ColorPickerDialog("Duotone — pick shadow & highlight colors", Color.FromArgb(255, 30, 20, 80), Color.FromArgb(255, 250, 240, 210));
+        var (ok2, shadow, highlight) = await picker.ShowDialogAsync(this);
+        if (!ok2) return;
+        RunFilterDialog("Duotone", Array.Empty<(string, double, double, double)>(), (h, _) =>
+            Engine.aurora_filter_duotone(h, shadow.R, shadow.G, shadow.B, highlight.R, highlight.G, highlight.B),
+            preApply: (h, _) => Engine.aurora_filter_duotone(h, shadow.R, shadow.G, shadow.B, highlight.R, highlight.G, highlight.B));
+    }
+
+    private async void DoPhotoFilter()
+    {
+        var d = Doc();
+        if (d == null) return;
+        var presets = new (string Name, byte R, byte G, byte B)[]
+        {
+            ("Warming 85", 236, 138, 0), ("Cooling 80", 0, 68, 255), ("Sepia", 174, 118, 50),
+            ("Red", 255, 0, 0), ("Green", 0, 255, 60), ("Blue", 0, 60, 255), ("Violet", 130, 0, 255),
+        };
+        var dlg = new PresetColorDialog("Photo Filter", presets);
+        var (ok2, color, density, preserve) = await dlg.ShowDialogAsync(this);
+        if (!ok2) return;
+        RunFilterDialog("Photo Filter", new[] { ("Density", 0.0, 100.0, (double)density) },
+            (h, v) => Engine.aurora_adj_photo_filter(h, color.R, color.G, color.B, (int)v[0], preserve ? 1 : 0));
+    }
+
+    private async void DoGradientMap()
+    {
+        var d = Doc();
+        if (d == null) return;
+        var picker = new ColorPickerDialog("Gradient Map — pick shadow & highlight colors", Colors.Black, Colors.White);
+        var (ok2, shadow, highlight) = await picker.ShowDialogAsync(this);
+        if (!ok2) return;
+        RunFilterDialog("Gradient Map", Array.Empty<(string, double, double, double)>(), (h, _) =>
+            Engine.aurora_adj_gradient_map(h, shadow.R, shadow.G, shadow.B, highlight.R, highlight.G, highlight.B),
+            preApply: (h, _) => Engine.aurora_adj_gradient_map(h, shadow.R, shadow.G, shadow.B, highlight.R, highlight.G, highlight.B));
+    }
+
+    /// <summary>One-click Auto Enhance: auto tone + vibrance + slight clarity, as one history group.</summary>
+    private void DoAutoEnhance()
+    {
+        var d = Doc();
+        if (d == null) return;
+        int rc1 = Engine.aurora_adj_auto_tone(d.Handle);
+        int rc2 = Engine.aurora_adj_vibrance(d.Handle, 25);
+        int rc3 = Engine.aurora_adj_clarity(d.Handle, 15);
+        SetStatusMessage((rc1 == 0 && rc2 == 0 && rc3 == 0)
+            ? "Auto Enhance applied (tone + vibrance + clarity)"
+            : $"Auto Enhance: {(rc1 != 0 ? "tone skipped " : "")}{(rc2 != 0 ? "vibrance skipped " : "")}{(rc3 != 0 ? "clarity skipped" : "")}");
+        d.RefreshState();
+        RefreshPanels();
+        OnImageStructureChanged();
+    }
+
     // ══════════ workspace & panels ══════════
 
-    private void SetWorkspace(bool color, bool layers, bool history)
+    private void SetWorkspace(bool color, bool layers, bool history, bool histogram, bool navigator)
     {
         ColorPanelCtl.IsVisible = color;
         LayersPanelCtl.IsVisible = layers;
         HistoryPanelCtl.IsVisible = history;
+        HistogramPanelCtl.IsVisible = histogram;
+        NavigatorPanelCtl.IsVisible = navigator;
         var s = AuroraStudio.App.Settings;
         if (s != null)
         {
             s.ShowColorPanel = color;
             s.ShowLayersPanel = layers;
             s.ShowHistoryPanel = history;
+            s.ShowHistogramPanel = histogram;
+            s.ShowNavigatorPanel = navigator;
             s.Save();
         }
         SetStatusMessage("Workspace updated");
     }
 
+    private void TogglePanel(Avalonia.Controls.Control panel, Action<AppSettings, bool> flag)
+    {
+        panel.IsVisible = !panel.IsVisible;
+        var s = AuroraStudio.App.Settings;
+        if (s != null) { flag(s, panel.IsVisible); s.Save(); }
+    }
+
     private void ToggleHistory()
     {
         HistoryPanelCtl.IsVisible = !HistoryPanelCtl.IsVisible;
+        var s = AuroraStudio.App.Settings;
+        if (s != null) { s.ShowHistoryPanel = HistoryPanelCtl.IsVisible; s.Save(); }
     }
 
     // ══════════ misc UI ══════════

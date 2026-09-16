@@ -11,11 +11,14 @@ public class AppSettings
     public bool ShowHistoryPanel { get; set; } = true;
     public bool ShowColorPanel { get; set; } = true;
     public bool ShowLayersPanel { get; set; } = true;
+    public bool ShowHistogramPanel { get; set; } = true;
+    public bool ShowNavigatorPanel { get; set; } = true;
     public string Workspace { get; set; } = "Default";
+    public List<string> RecentFiles { get; set; } = new();
     public Dictionary<string, string> Shortcuts { get; set; } = new();
     public double WindowWidth { get; set; } = 0;   // 0 = auto-fit to screen on first launch
     public double WindowHeight { get; set; } = 0;  // 0 = auto-fit to screen on first launch
-    public double RightDockWidth { get; set; } = 292;
+    public double RightDockWidth { get; set; } = 300;
     public bool WindowMaximized { get; set; } = false;
 
     [System.Text.Json.Serialization.JsonIgnore]

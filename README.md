@@ -2,6 +2,8 @@
 
 **A professional image editor and digital painting application — a true native desktop program.**
 
+**v3.0** — crash-proof release: the three panel/text bugs reported on 09/16 are root-caused and fixed, plus a large professional upgrade: 16 new color adjustments, 21 new effects, live Histogram & Navigator panels, drag-and-drop open, recent files, one-click Auto Enhance, and a redesigned icon set. Every tool is now exercised by an automated 100-step audit on real Windows & Linux runners.
+
 - **UI:** Avalonia 11 (C# / .NET 8) — native compiled Fluent dark interface, GPU-accelerated (Skia/ANGLE) rendering with automatic software fallback
 - **Engine:** Rust (`aurora_engine`) — speed and memory safety, panic-guarded C ABI
 - **Zero web technologies.** No Electron, no WebView, no browser runtime.
@@ -16,8 +18,9 @@
 | Selections | Rect, ellipse, lasso, magic wand (tolerance, contiguous), feather, invert, add (Shift) / subtract (Alt) |
 | Transform | Move, scale, rotate, flip (layer & canvas), crop, image resize (nearest/bilinear/bicubic), canvas resize with anchor, perspective warp |
 | Color | Eyedropper, HSV picker + hue bar, RGB/HEX fields, swatches, paint bucket (tolerance, contiguous), linear/radial gradients with dithering |
-| Adjustments | Curves (per-channel monotone cubic), Levels, Brightness/Contrast, Hue/Saturation/Lightness — all selection-aware |
-| Filters | Gaussian blur, sharpen (unsharp mask), add noise, pixelate, twirl, wave, emboss — all selection-aware, dialogs with live preview |
+| Adjustments | Curves (per-channel monotone cubic), Levels, Brightness/Contrast, Hue/Saturation/Lightness, **Exposure/Gamma, Vibrance, White Balance (temp/tint), Shadows/Highlights, Color Balance, Black & White (channel weights), Photo Filter (presets + density), Gradient Map, Threshold, Posterize, Invert, Desaturate, Auto Tone, Auto Contrast, Auto Color, one-click Auto Enhance** — all selection-aware |
+| Filters & effects | Gaussian blur, sharpen, noise, pixelate, twirl, wave, emboss **+ Box Blur, Motion Blur, Zoom Blur, Unsharp Mask (radius/strength/threshold), Clarity (midtone local contrast), Noise Reduction (median), Find Edges (Sobel), Oil Paint (Kuwahara), Halftone, Charcoal, Pencil Sketch, Vignette, Bloom/Glow, Film Grain, Scanlines (CRT), Glitch, Chromatic Aberration, Duotone, Ripple, Pinch/Bulge, Render Clouds (fBm)** — all selection-aware, dialogs with live preview |
+| Panels | Color (HSV + swatches + recent), Layers (tree, thumbnails, blend, opacity, 9 ops), History (click-to-jump), **Histogram (live, engine-computed)**, **Navigator (live thumbnail, click-to-pan, viewport rect)** |
 | Shapes & text | Rectangle / ellipse / line with fill & stroke, text tool with font family/size/bold/italic (Skia-rendered) |
 | Navigation | Multi-document tabs, wheel zoom at cursor, space/middle-drag pan, **Hand (H)** & **Zoom (Z)** tools, fit / 100% |
 | Undo | Full command-based undo/redo with history panel (click any state to jump) |

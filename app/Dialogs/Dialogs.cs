@@ -348,7 +348,14 @@ public class FilterParamDialog
             grid.Children.Add(row);
         }
         if (_preview != null)
+        {
             grid.Children.Add(new TextBlock { Text = "Live preview is shown on the canvas.", Foreground = DialogUtil.Brush(0x6E, 0x73, 0x78), FontSize = 11, Margin = new Thickness(0, 8, 0, 0) });
+            if (_pars.Length == 0)
+            {
+                // parameterless op (duotone/gradient-map): render the preview once on open
+                _preview(Array.Empty<double>());
+            }
+        }
         var (oc, ok, cancel) = DialogUtil.OkCancel();
         grid.Children.Add(oc);
         var dlg = DialogUtil.Make(_title, grid);
@@ -729,5 +736,146 @@ public class ShortcutsDialog
         var dlg = DialogUtil.Make("Keyboard Shortcuts", grid);
         close.Tag = dlg;
         _ = dlg.ShowDialog(owner);
+    }
+}
+
+// ═══════════════════ v3.0: two-color picker (Duotone / Gradient Map) ═══════════════════
+
+public class ColorPickerDialog
+{
+    private readonly string _title;
+    private readonly Color _c1Init;
+    private readonly Color _c2Init;
+
+    public ColorPickerDialog(string title, Color c1Init, Color c2Init)
+    {
+        _title = title;
+        _c1Init = c1Init;
+        _c2Init = c2Init;
+    }
+
+    public Task<(bool ok, Color c1, Color c2)> ShowDialogAsync(Window owner)
+    {
+        var tcs = new TaskCompletionSource<(bool, Color, Color)>();
+        var grid = new StackPanel { Margin = new Thickness(22), Spacing = 10 };
+
+        Color c1 = _c1Init, c2 = _c2Init;
+
+        Border SwatchBox(Color c) => new()
+        {
+            Width = 64, Height = 26,
+            CornerRadius = new Avalonia.CornerRadius(4),
+            BorderBrush = DialogUtil.Brush(0x4A, 0x4D, 0x54),
+            BorderThickness = new Avalonia.Thickness(1),
+            Background = new SolidColorBrush(c),
+        };
+
+        (StackPanel row, TextBox hex, Border swatch) ColorRow(string label, Color init)
+        {
+            var swatch = SwatchBox(init);
+            var hex = new TextBox { Text = $"#{init.R:X2}{init.G:X2}{init.B:X2}", MinWidth = 90 };
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+            row.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center, Width = 90, Foreground = DialogUtil.Brush(0xB9, 0xBE, 0xC5) });
+            row.Children.Add(swatch);
+            row.Children.Add(hex);
+            var presets = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Avalonia.Thickness(100, 4, 0, 4) };
+            Color[] pal = { Colors.Black, Colors.White, Colors.Gray, Color.FromArgb(255, 30, 20, 80), Color.FromArgb(255, 250, 240, 210), Color.FromArgb(255, 174, 118, 50), Color.FromArgb(255, 236, 138, 0), Color.FromArgb(255, 0, 68, 255), Color.FromArgb(255, 40, 160, 90), Color.FromArgb(255, 200, 40, 60) };
+            foreach (var p in pal)
+            {
+                var b = new Border { Width = 22, Height = 22, CornerRadius = new Avalonia.CornerRadius(3), Background = new SolidColorBrush(p), Margin = new Avalonia.Thickness(0, 0, 4, 4) };
+                b.PointerPressed += (_, _) => { hex.Text = $"#{p.R:X2}{p.G:X2}{p.B:X2}"; swatch.Background = new SolidColorBrush(p); };
+                presets.Children.Add(b);
+            }
+            row.Children.Add(presets);
+            hex.TextChanged += (_, _) =>
+            {
+                try { var c = Avalonia.Media.Color.Parse(hex.Text!.Trim()); swatch.Background = new SolidColorBrush(c); } catch { }
+            };
+            return (row, hex, swatch);
+        }
+
+        var (row1, hex1, sw1) = ColorRow("Shadows:", c1);
+        var (row2, hex2, sw2) = ColorRow("Highlights:", c2);
+        grid.Children.Add(row1);
+        grid.Children.Add(row2);
+
+        var (oc, ok, cancel) = DialogUtil.OkCancel();
+        grid.Children.Add(oc);
+        var dlg = DialogUtil.Make(_title, grid);
+        ok.Click += (_, _) =>
+        {
+            try { c1 = Avalonia.Media.Color.Parse(hex1.Text!.Trim()); } catch { c1 = _c1Init; }
+            try { c2 = Avalonia.Media.Color.Parse(hex2.Text!.Trim()); } catch { c2 = _c2Init; }
+            _ = sw1; _ = sw2;
+            tcs.TrySetResult((true, c1, c2));
+            dlg.Close();
+        };
+        cancel.Click += (_, _) => { tcs.TrySetResult((false, c1, c2)); dlg.Close(); };
+        _ = dlg.ShowDialog(owner);
+        dlg.Closed += (_, _) => tcs.TrySetResult((false, c1, c2));
+        return tcs.Task;
+    }
+}
+
+// ═══════════════════ v3.0: photo-filter preset dialog ═══════════════════
+
+public class PresetColorDialog
+{
+    private readonly string _title;
+    private readonly (string Name, byte R, byte G, byte B)[] _presets;
+
+    public PresetColorDialog(string title, (string Name, byte R, byte G, byte B)[] presets)
+    {
+        _title = title;
+        _presets = presets;
+    }
+
+    public Task<(bool ok, Color color, int density, bool preserveLuma)> ShowDialogAsync(Window owner)
+    {
+        var tcs = new TaskCompletionSource<(bool, Color, int, bool)>();
+        var grid = new StackPanel { Margin = new Thickness(22), Spacing = 10 };
+        Color chosen = Color.FromArgb(255, _presets[0].R, _presets[0].G, _presets[0].B);
+        var preview = new Border { Height = 26, CornerRadius = new Avalonia.CornerRadius(4), Background = new SolidColorBrush(chosen) };
+
+        var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
+        foreach (var p in _presets)
+        {
+            var pc = p;
+            var b = new Button
+            {
+                Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal, Spacing = 6,
+                    Children =
+                    {
+                        new Border { Width = 14, Height = 14, CornerRadius = new Avalonia.CornerRadius(2), Background = new SolidColorBrush(Color.FromRgb(pc.R, pc.G, pc.B)) },
+                        new TextBlock { Text = pc.Name, VerticalAlignment = VerticalAlignment.Center },
+                    },
+                },
+                Padding = new Avalonia.Thickness(8, 4),
+            };
+            b.Click += (_, _) => { chosen = Color.FromRgb(pc.R, pc.G, pc.B); preview.Background = new SolidColorBrush(chosen); };
+            wrap.Children.Add(b);
+        }
+        grid.Children.Add(wrap);
+        grid.Children.Add(preview);
+
+        var (densRow, dens) = DialogUtil.NumField("Density", 0, 100, 35);
+        grid.Children.Add(densRow);
+        var preserve = new CheckBox { Content = "Preserve luminosity", IsChecked = true };
+        grid.Children.Add(preserve);
+
+        var (oc, ok, cancel) = DialogUtil.OkCancel();
+        grid.Children.Add(oc);
+        var dlg = DialogUtil.Make(_title, grid);
+        ok.Click += (_, _) =>
+        {
+            tcs.TrySetResult((true, chosen, (int)dens.Value, preserve.IsChecked == true));
+            dlg.Close();
+        };
+        cancel.Click += (_, _) => { tcs.TrySetResult((false, chosen, (int)dens.Value, preserve.IsChecked == true)); dlg.Close(); };
+        _ = dlg.ShowDialog(owner);
+        dlg.Closed += (_, _) => tcs.TrySetResult((false, chosen, (int)dens.Value, preserve.IsChecked == true));
+        return tcs.Task;
     }
 }

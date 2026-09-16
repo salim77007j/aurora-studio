@@ -19,6 +19,15 @@ internal static class Program
             return;
         }
 
+        // v3.0 exhaustive ops audit — every new adjustment/effect applies + undoes cleanly.
+        if (System.Linq.Enumerable.Contains(args, "--opsaudit"))
+        {
+            int rc = AuroraStudio.Interop.Engine.aurora_ops_audit();
+            Console.WriteLine($"[aurora] ops audit: {(rc == 0 ? "PASS (37 ops)" : "FAIL " + rc + " " + AuroraStudio.Interop.Engine.LastError())}");
+            Environment.Exit(rc == 0 ? 0 : 1);
+            return;
+        }
+
         // ---- global crash capture: log every unhandled exception instead of dying silently ----
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             WriteCrash("APPDOMAIN", e.ExceptionObject as Exception ?? new Exception(e.ExceptionObject?.ToString()));

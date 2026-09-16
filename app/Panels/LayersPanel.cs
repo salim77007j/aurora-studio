@@ -9,6 +9,7 @@ using Avalonia.Controls.Templates;
 using Avalonia.Media.Imaging;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.Threading;
 using AuroraStudio.Interop;
 using AuroraStudio.Models;
 using AuroraStudio.Controls;
@@ -20,18 +21,27 @@ public class LayerRow
 {
     public LayerInfo Info { get; init; } = null!;
     public int Depth { get; init; }
-    public string Name => Info.Name;
-    public bool IsGroup => Info.IsGroup;
-    public bool Visible => Info.Visible;
-    public string ThumbLabel => Info.IsGroup ? "\u229e" : "";
+    public string Name => Info?.Name ?? "(layer)";
+    public bool IsGroup => Info?.IsGroup ?? false;
+    public bool Visible => Info?.Visible ?? true;
+    public string ThumbLabel => Info?.IsGroup == true ? "\u229e" : "";
     public IBrush ThumbBg { get; set; } = Brushes.Transparent;
     public Bitmap? ThumbImage { get; set; }
-    public bool Selected => _win != null && _win.ActiveDoc?.State.ActiveId == Info.Id;
+    public bool Selected => _win != null && _win.ActiveDoc?.State.ActiveId == Info?.Id;
     public MainWindow? _win;
     public IBrush RowBg => Selected ? new SolidColorBrush(Color.FromRgb(0x33, 0x46, 0x5F)) : Brushes.Transparent;
 }
 
 /// <summary>Layers panel: tree with thumbnails, visibility, blend, opacity, full layer ops.</summary>
+/// <remarks>
+/// Crash-proofing notes (v3.0): the old version called the XAML-generated field
+/// `MainWindow.Canvas` from the SelectionChanged handler — that field is never
+/// populated with the runtime XAML loader, so every row click threw
+/// NullReferenceException (the user's "crashes when I use certain tools").
+/// Now every control access goes through null-safe accessors, collection rebuilds
+/// detach the ItemsSource first (no SelectionModel re-entrancy), and every event
+/// body is wrapped so an exception can never propagate into Avalonia internals.
+/// </remarks>
 public class LayersPanel : Border
 {
     private readonly MainWindow _win;
@@ -45,7 +55,7 @@ public class LayersPanel : Border
     public LayersPanel(MainWindow win)
     {
         _win = win;
-        _list = new ListBox { ItemsSource = _rows, MaxHeight = 240, MinHeight = 80 };
+        _list = new ListBox { ItemsSource = _rows, MaxHeight = 260, MinHeight = 80 };
         _list.ItemTemplate = MakeRowTemplate();
         _list.SelectionChanged += OnRowSelected;
 
@@ -54,25 +64,33 @@ public class LayersPanel : Border
         _blend.SelectionChanged += (_, _) =>
         {
             if (_updating || _blend.SelectedIndex < 0) return;
-            var row = SelectedRow();
-            var doc = _win.ActiveDoc;
-            if (row != null && doc != null)
+            try
             {
-                Engine.aurora_layer_set_blend(doc.Handle, row.Info.Id, _blend.SelectedIndex);
-                doc.RefreshState();
-                _win.Canvas.InvalidateAnts();
+                var row = SelectedRow();
+                var doc = _win.ActiveDoc;
+                if (row?.Info != null && doc != null)
+                {
+                    Engine.aurora_layer_set_blend(doc.Handle, row.Info.Id, _blend.SelectedIndex);
+                    doc.RefreshState();
+                    _win.TheCanvas.InvalidateAnts();
+                }
             }
+            catch (Exception ex) { Program.WriteCrash("LAYERS", ex); }
         };
         _opacity.ValueChanged += (_, e) =>
         {
             if (_updating) return;
-            var row = SelectedRow();
-            var doc = _win.ActiveDoc;
-            if (row != null && doc != null)
+            try
             {
-                Engine.aurora_layer_set_opacity(doc.Handle, row.Info.Id, (float)(e.NewValue / 100.0));
-                doc.RefreshState();
+                var row = SelectedRow();
+                var doc = _win.ActiveDoc;
+                if (row?.Info != null && doc != null)
+                {
+                    Engine.aurora_layer_set_opacity(doc.Handle, row.Info.Id, (float)(e.NewValue / 100.0));
+                    doc.RefreshState();
+                }
             }
+            catch (Exception ex) { Program.WriteCrash("LAYERS", ex); }
         };
 
         var buttons = new WrapPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
@@ -104,8 +122,8 @@ public class LayersPanel : Border
 
         Child = new Border
         {
-            Background = ColorPanel.Brush(0x2A, 0x2C, 0x31),
-            CornerRadius = new CornerRadius(6),
+            Background = ColorPanel.Brush(0x26, 0x28, 0x2D),
+            CornerRadius = new CornerRadius(8),
             Padding = new Thickness(10),
             Child = root,
         };
@@ -113,7 +131,6 @@ public class LayersPanel : Border
 
     private FuncDataTemplate<LayerRow> MakeRowTemplate()
     {
-        // build with a func-based template via ItemsPanel? Avalonia needs XAML or DataTemplate; use FuncDataTemplate
         return new FuncDataTemplate<LayerRow>((row, _) =>
         {
             var panel = new Panel();
@@ -125,12 +142,16 @@ public class LayersPanel : Border
             var eye = new TextBlock { Text = row?.Visible == true ? "◉" : "◌", Width = 18, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center, Cursor = new Cursor(Avalonia.Input.StandardCursorType.Hand), FontSize = 13 };
             eye.Tapped += (_, _) =>
             {
-                if (row?._win is MainWindow w && w.ActiveDoc != null)
+                try
                 {
-                    Engine.aurora_layer_set_visible(w.ActiveDoc.Handle, row.Info.Id, row.Visible ? 0 : 1);
-                    w.ActiveDoc.RefreshState();
-                    w.RefreshPanels();
+                    if (row?._win is MainWindow w && w.ActiveDoc != null && row.Info != null)
+                    {
+                        Engine.aurora_layer_set_visible(w.ActiveDoc.Handle, row.Info.Id, row.Visible ? 0 : 1);
+                        w.ActiveDoc.RefreshState();
+                        w.RefreshPanels();
+                    }
                 }
+                catch (Exception ex) { Program.WriteCrash("LAYERS", ex); }
             };
             sp.Children.Add(eye);
 
@@ -149,12 +170,16 @@ public class LayersPanel : Border
             var name = new TextBlock { Text = row?.Name ?? "", VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center, FontSize = 12.5 };
             name.Tapped += (_, _) =>
             {
-                if (row?._win is MainWindow w && w.ActiveDoc != null)
+                try
                 {
-                    Engine.aurora_layer_set_active(w.ActiveDoc.Handle, row.Info.Id);
-                    w.ActiveDoc.RefreshState();
-                    w.RefreshPanels();
+                    if (row?._win is MainWindow w && w.ActiveDoc != null && row.Info != null)
+                    {
+                        Engine.aurora_layer_set_active(w.ActiveDoc.Handle, row.Info.Id);
+                        w.ActiveDoc.RefreshState();
+                        w.RefreshPanels();
+                    }
                 }
+                catch (Exception ex) { Program.WriteCrash("LAYERS", ex); }
             };
             sp.Children.Add(name);
             content.Child = sp;
@@ -166,47 +191,49 @@ public class LayersPanel : Border
 
     private LayerRow? SelectedRow()
     {
-        if (_list.SelectedItem is LayerRow r) return r;
+        if (_list.SelectedItem is LayerRow r && r.Info != null) return r;
         return null;
     }
 
     public void Refresh(AuroraDocument? doc)
     {
         _updating = true;
-        _rows.Clear();
-        if (doc == null)
+        try
         {
-            _updating = false;
-            return;
-        }
-        // top-first display
-        void Walk(List<LayerInfo> list, int depth)
-        {
-            foreach (var li in list)
+            // Detach first: the SelectionModel must never observe a partial list
+            // (this was the source of the ArgumentOutOfRangeException re-entrancy).
+            _list.ItemsSource = null;
+            _rows.Clear();
+            if (doc == null)
             {
-                var row = new LayerRow { Info = li, Depth = depth, _win = _win };
-                row.ThumbBg = Checker();
-                _rows.Add(row);
-                if (li.Children != null && li.Children.Count > 0 && li.Expanded)
-                    Walk(li.Children, depth + 1);
+                _list.ItemsSource = _rows;
+                _nameLabel.Text = "";
+                return;
             }
-        }
-        Walk(doc.State.Layers, 0);
-
-        // thumbnails (async-ish: generate for first 24 layers)
-        var ids = new List<(LayerRow Row, ulong Id)>();
-        void Walk2(List<LayerInfo> list, List<LayerRow> outRows)
-        {
-            // mirror Walk order
-        }
-        int idx = 0;
-        void WalkIds(List<LayerInfo> list)
-        {
-            foreach (var li in list)
+            // top-first display
+            var flat = new List<(LayerRow Row, LayerInfo Info)>();
+            void Walk(List<LayerInfo> list, int depth)
             {
-                if (idx < _rows.Count && !li.IsGroup)
+                foreach (var li in list)
                 {
-                    var row = _rows[idx];
+                    var row = new LayerRow { Info = li, Depth = depth, _win = _win };
+                    row.ThumbBg = Checker();
+                    _rows.Add(row);
+                    flat.Add((row, li));
+                    if (li.Children != null && li.Children.Count > 0 && li.Expanded)
+                        Walk(li.Children, depth + 1);
+                }
+            }
+            Walk(doc.State.Layers, 0);
+
+            // thumbnails (first 24 layers to keep refresh snappy)
+            int count = Math.Min(flat.Count, 24);
+            for (int i = 0; i < count; i++)
+            {
+                var (row, li) = flat[i];
+                if (li.IsGroup) continue;
+                try
+                {
                     var buf = new byte[32 * 32 * 4];
                     int need = Engine.LayerThumbnail(doc.Handle, li.Id, 32, buf);
                     if (need == buf.Length)
@@ -226,21 +253,33 @@ public class LayersPanel : Border
                         row.ThumbImage = wb;
                     }
                 }
-                idx++;
-                if (li.Children != null) WalkIds(li.Children);
+                catch { /* thumbnail is best-effort */ }
             }
-        }
-        WalkIds(doc.State.Layers);
 
-        var sel = doc.State.FindLayer(doc.State.Layers, doc.State.ActiveId);
-        if (sel != null)
-        {
-            _nameLabel.Text = sel.Name;
-            _blend.SelectedIndex = Math.Clamp(sel.Blend, 0, BlendModeNames.Names.Length - 1);
-            _opacity.Value = sel.Opacity * 100;
+            var sel = doc.State.FindLayer(doc.State.Layers, doc.State.ActiveId);
+            if (sel != null)
+            {
+                _nameLabel.Text = sel.Name;
+                _blend.SelectedIndex = Math.Clamp(sel.Blend, 0, BlendModeNames.Names.Length - 1);
+                _opacity.Value = sel.Opacity * 100;
+            }
+            _list.ItemsSource = _rows;
+
+            // restore selection highlight without re-triggering engine calls
+            int selIdx = -1;
+            for (int i = 0; i < _rows.Count; i++)
+                if (_rows[i].Info?.Id == doc.State.ActiveId) { selIdx = i; break; }
+            if (selIdx >= 0) _list.SelectedIndex = selIdx;
         }
-        _updating = false;
-        _list.InvalidateVisual();
+        catch (Exception ex)
+        {
+            Program.WriteCrash("LAYERS", ex);
+        }
+        finally
+        {
+            _updating = false;
+            _list.InvalidateVisual();
+        }
     }
 
     private static IBrush Checker()
@@ -273,9 +312,13 @@ public class LayersPanel : Border
             Content = path,
             Width = 30, Height = 26,
             Padding = new Thickness(2),
-// tooltip set below
         };
-        b.Click += (_, _) => action();
+        ToolTip.SetTip(b, tip);
+        b.Click += (_, _) =>
+        {
+            try { action(); }
+            catch (Exception ex) { Program.WriteCrash("LAYERS", ex); _win.SetStatusMessage("Layer op failed: " + ex.Message); }
+        };
         return b;
     }
 
@@ -359,13 +402,20 @@ public class LayersPanel : Border
     private void OnRowSelected(object? sender, SelectionChangedEventArgs e)
     {
         if (_updating) return;
-        var row = SelectedRow();
-        var doc = _win.ActiveDoc;
-        if (row != null && doc != null)
+        try
         {
-            Engine.aurora_layer_set_active(doc.Handle, row.Info.Id);
-            doc.RefreshState();
-            _win.Canvas.InvalidateAnts();
+            var row = SelectedRow();
+            var doc = _win.ActiveDoc;
+            if (row?.Info != null && doc != null)
+            {
+                Engine.aurora_layer_set_active(doc.Handle, row.Info.Id);
+                doc.RefreshState();
+                _win.TheCanvas.InvalidateAnts();
+            }
+        }
+        catch (Exception ex)
+        {
+            Program.WriteCrash("LAYERS", ex);
         }
     }
 }

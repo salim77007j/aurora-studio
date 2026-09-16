@@ -53,11 +53,13 @@ jobs:
           Get-ChildItem publish | Select-Object Name, Length
         shell: pwsh
 
-      - name: Engine self-test (real exe, no UI needed)
+      - name: Engine self-test + v3 ops audit (real exe, no UI needed)
         working-directory: app\publish
         run: |
           $proc = Start-Process -FilePath ".\AuroraStudio.exe" -ArgumentList "--selftest" -Wait -PassThru
           if ($proc.ExitCode -ne 0) { throw "engine selftest failed with $($proc.ExitCode)" }
+          $proc2 = Start-Process -FilePath ".\AuroraStudio.exe" -ArgumentList "--opsaudit" -Wait -PassThru
+          if ($proc2.ExitCode -ne 0) { throw "v3 ops audit failed with $($proc2.ExitCode)" }
         shell: pwsh
 
       - name: Tool audit (drives every tool through the real UI)
@@ -142,6 +144,10 @@ jobs:
             engine/target
           key: cargo-linux-${{ hashFiles('engine/Cargo.lock') }}
 
+      - name: Engine unit tests (all filters/adjustments audited)
+        working-directory: engine
+        run: cargo test --release
+
       - name: Build engine (release)
         working-directory: engine
         run: cargo build --release
@@ -166,10 +172,11 @@ jobs:
             -o publish
           ls -la publish
 
-      - name: Engine self-test
+      - name: Engine self-test + v3 ops audit
         working-directory: app/publish
         run: |
           ./AuroraStudio --selftest
+          ./AuroraStudio --opsaudit
 
       - name: Tool audit under Xvfb (every tool through the real UI)
         run: |
@@ -215,6 +222,7 @@ jobs:
           DISPLAY=:77 ffmpeg -y -loglevel error -f x11grab -video_size 1600x1000 -i :77 -frames:v 1 app/publish/shots/linux_main.png
           sleep 1
           DISPLAY=:77 ffmpeg -y -loglevel error -f x11grab -video_size 1600x1000 -i :77 -frames:v 1 app/publish/shots/linux_main2.png
+          cp /tmp/aurora_ui_capture.png app/publish/shots/aurora_ui_capture.png 2>/dev/null || true
           kill $APP_PID 2>/dev/null
           ls -la app/publish/shots
 
@@ -227,4 +235,5 @@ jobs:
             app/publish/toolreport.json
             app/publish/shots/linux_main.png
             app/publish/shots/linux_main2.png
+            app/publish/shots/aurora_ui_capture.png
           if-no-files-found: error

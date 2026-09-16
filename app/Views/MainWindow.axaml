@@ -88,6 +88,7 @@
       <MenuItem Header="_File">
         <MenuItem Header="New…" Command="{Binding CmdNew}" InputGesture="Ctrl+N"/>
         <MenuItem Header="Open…" Command="{Binding CmdOpen}" InputGesture="Ctrl+O"/>
+        <MenuItem x:Name="MnuRecent" Header="Open Recent"/>
         <Separator/>
         <MenuItem Header="Save" Command="{Binding CmdSave}" InputGesture="Ctrl+S"/>
         <MenuItem Header="Export As…" Command="{Binding CmdExport}" InputGesture="Ctrl+Shift+E"/>
@@ -141,22 +142,74 @@
         <MenuItem Header="Feather…" Command="{Binding CmdFeather}"/>
       </MenuItem>
       <MenuItem Header="F_ilter">
-        <MenuItem Header="Gaussian Blur…" Command="{Binding CmdFGauss}"/>
-        <MenuItem Header="Sharpen…" Command="{Binding CmdFSharpen}"/>
-        <MenuItem Header="Add Noise…" Command="{Binding CmdFNoise}"/>
-        <MenuItem Header="Pixelate…" Command="{Binding CmdFPixelate}"/>
-        <Separator/>
+        <MenuItem Header="Blur &amp; Sharpness">
+          <MenuItem Header="Gaussian Blur…" Command="{Binding CmdFGauss}"/>
+          <MenuItem Header="Box Blur…" Command="{Binding CmdFBoxBlur}"/>
+          <MenuItem Header="Motion Blur…" Command="{Binding CmdFMotionBlur}"/>
+          <MenuItem Header="Zoom Blur…" Command="{Binding CmdFZoomBlur}"/>
+          <Separator/>
+          <MenuItem Header="Sharpen…" Command="{Binding CmdFSharpen}"/>
+          <MenuItem Header="Unsharp Mask…" Command="{Binding CmdFUnsharp}"/>
+          <MenuItem Header="Clarity…" Command="{Binding CmdFClarity}"/>
+        </MenuItem>
         <MenuItem Header="Distort">
           <MenuItem Header="Twirl…" Command="{Binding CmdFTwirl}"/>
           <MenuItem Header="Wave…" Command="{Binding CmdFWave}"/>
-          <MenuItem Header="Emboss" Command="{Binding CmdFEmboss}"/>
+          <MenuItem Header="Ripple…" Command="{Binding CmdFRipple}"/>
+          <MenuItem Header="Pinch / Bulge…" Command="{Binding CmdFPinch}"/>
         </MenuItem>
+        <MenuItem Header="Stylize">
+          <MenuItem Header="Emboss" Command="{Binding CmdFEmboss}"/>
+          <MenuItem Header="Find Edges" Command="{Binding CmdFFindEdges}"/>
+          <MenuItem Header="Oil Paint…" Command="{Binding CmdFOilPaint}"/>
+          <MenuItem Header="Halftone…" Command="{Binding CmdFHalftone}"/>
+          <MenuItem Header="Charcoal…" Command="{Binding CmdFCharcoal}"/>
+          <MenuItem Header="Pencil Sketch…" Command="{Binding CmdFPencil}"/>
+        </MenuItem>
+        <MenuItem Header="Effects">
+          <MenuItem Header="Vignette…" Command="{Binding CmdFVignette}"/>
+          <MenuItem Header="Bloom / Glow…" Command="{Binding CmdFBloom}"/>
+          <MenuItem Header="Film Grain…" Command="{Binding CmdFGrain}"/>
+          <MenuItem Header="Scanlines (CRT)…" Command="{Binding CmdFScanlines}"/>
+          <MenuItem Header="Glitch…" Command="{Binding CmdFGlitch}"/>
+          <MenuItem Header="Chromatic Aberration…" Command="{Binding CmdFChromatic}"/>
+          <MenuItem Header="Duotone…" Command="{Binding CmdFDuotone}"/>
+        </MenuItem>
+        <MenuItem Header="Noise">
+          <MenuItem Header="Add Noise…" Command="{Binding CmdFNoise}"/>
+          <MenuItem Header="Noise Reduction (Median)" Command="{Binding CmdFMedian}"/>
+        </MenuItem>
+        <MenuItem Header="Render">
+          <MenuItem Header="Clouds…" Command="{Binding CmdFClouds}"/>
+        </MenuItem>
+        <MenuItem Header="Pixelate…" Command="{Binding CmdFPixelate}"/>
       </MenuItem>
       <MenuItem Header="_Colors">
+        <MenuItem Header="Auto Enhance" Command="{Binding CmdAutoEnhance}"/>
+        <Separator/>
+        <MenuItem Header="Auto Tone" Command="{Binding CmdAutoTone}"/>
+        <MenuItem Header="Auto Contrast" Command="{Binding CmdAutoContrast}"/>
+        <MenuItem Header="Auto Color" Command="{Binding CmdAutoColor}"/>
+        <Separator/>
         <MenuItem Header="Brightness / Contrast…" Command="{Binding CmdAdjBC}"/>
         <MenuItem Header="Levels…" Command="{Binding CmdAdjLevels}"/>
         <MenuItem Header="Curves…" Command="{Binding CmdAdjCurves}"/>
+        <MenuItem Header="Exposure…" Command="{Binding CmdAdjExposure}"/>
+        <MenuItem Header="Shadows / Highlights…" Command="{Binding CmdAdjShadowsHi}"/>
+        <Separator/>
         <MenuItem Header="Hue / Saturation…" Command="{Binding CmdAdjHSL}"/>
+        <MenuItem Header="Vibrance…" Command="{Binding CmdAdjVibrance}"/>
+        <MenuItem Header="White Balance…" Command="{Binding CmdAdjWhiteBalance}"/>
+        <MenuItem Header="Color Balance…" Command="{Binding CmdAdjColorBalance}"/>
+        <Separator/>
+        <MenuItem Header="Black &amp; White…" Command="{Binding CmdAdjBW}"/>
+        <MenuItem Header="Photo Filter…" Command="{Binding CmdAdjPhotoFilter}"/>
+        <MenuItem Header="Gradient Map…" Command="{Binding CmdAdjGradientMap}"/>
+        <MenuItem Header="Threshold…" Command="{Binding CmdAdjThreshold}"/>
+        <MenuItem Header="Posterize…" Command="{Binding CmdAdjPosterize}"/>
+        <Separator/>
+        <MenuItem Header="Invert" Command="{Binding CmdAdjInvert}"/>
+        <MenuItem Header="Desaturate" Command="{Binding CmdAdjDesaturate}"/>
       </MenuItem>
       <MenuItem Header="_View">
         <MenuItem Header="Zoom In" Command="{Binding CmdZoomIn}" InputGesture="Ctrl++"/>
@@ -168,8 +221,13 @@
           <MenuItem Header="Default" Command="{Binding CmdWsDefault}"/>
           <MenuItem Header="Minimal" Command="{Binding CmdWsMinimal}"/>
           <MenuItem Header="Painting" Command="{Binding CmdWsPainting}"/>
+          <MenuItem Header="Photo Editing" Command="{Binding CmdWsPhoto}"/>
         </MenuItem>
-        <MenuItem x:Name="MnuToggleHistory" Header="Show History Panel" Command="{Binding CmdToggleHistory}"/>
+        <MenuItem Header="Panels">
+          <MenuItem x:Name="MnuToggleHistogram" Header="Show Histogram Panel" Command="{Binding CmdToggleHistogram}"/>
+          <MenuItem x:Name="MnuToggleNavigator" Header="Show Navigator Panel" Command="{Binding CmdToggleNavigator}"/>
+          <MenuItem x:Name="MnuToggleHistory" Header="Show History Panel" Command="{Binding CmdToggleHistory}"/>
+        </MenuItem>
       </MenuItem>
       <MenuItem Header="_Help">
         <MenuItem Header="About Aurora Studio" Command="{Binding CmdAbout}"/>
@@ -242,10 +300,12 @@
 
       <!-- RIGHT PANELS (resizable, width persisted) -->
       <Border Grid.Column="3" x:Name="RightDock" Background="#252629" BorderBrush="#0D0D0F"
-              BorderThickness="1,0,0,0" MinWidth="236" MaxWidth="520" Width="292">
+              BorderThickness="1,0,0,0" MinWidth="244" MaxWidth="520" Width="300">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled">
           <StackPanel Spacing="8" Margin="8,8,8,8">
+            <ContentControl x:Name="NavigatorPanelHost"/>
             <ContentControl x:Name="ColorPanelHost"/>
+            <ContentControl x:Name="HistogramPanelHost"/>
             <ContentControl x:Name="LayersPanelHost"/>
             <ContentControl x:Name="HistoryPanelHost"/>
           </StackPanel>

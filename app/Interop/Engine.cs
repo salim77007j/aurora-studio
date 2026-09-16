@@ -85,6 +85,46 @@ public static unsafe class Engine
     [DllImport(Dll)] public static extern int aurora_filter_wave(ulong h, float amplitude, float wavelength, int vertical);
     [DllImport(Dll)] public static extern int aurora_filter_emboss(ulong h);
 
+    // ---------- v3.0 professional adjustments ----------
+    [DllImport(Dll)] public static extern int aurora_adj_exposure(ulong h, float stops, float gamma);
+    [DllImport(Dll)] public static extern int aurora_adj_vibrance(ulong h, int amount);
+    [DllImport(Dll)] public static extern int aurora_adj_white_balance(ulong h, int temperature, int tint);
+    [DllImport(Dll)] public static extern int aurora_adj_shadows_highlights(ulong h, int shadows, int highlights);
+    [DllImport(Dll)] public static extern int aurora_adj_color_balance(ulong h, int cr, int mg, int yb);
+    [DllImport(Dll)] public static extern int aurora_adj_black_white(ulong h, int rw, int gw, int bw);
+    [DllImport(Dll)] public static extern int aurora_adj_desaturate(ulong h);
+    [DllImport(Dll)] public static extern int aurora_adj_invert(ulong h);
+    [DllImport(Dll)] public static extern int aurora_adj_threshold(ulong h, int level);
+    [DllImport(Dll)] public static extern int aurora_adj_posterize(ulong h, int levels);
+    [DllImport(Dll)] public static extern int aurora_adj_photo_filter(ulong h, byte tr, byte tg, byte tb, int density, int preserve);
+    [DllImport(Dll)] public static extern int aurora_adj_gradient_map(ulong h, byte r0, byte g0, byte b0, byte r1, byte g1, byte b1);
+    [DllImport(Dll)] public static extern int aurora_adj_auto_tone(ulong h);
+    [DllImport(Dll)] public static extern int aurora_adj_auto_contrast(ulong h);
+    [DllImport(Dll)] public static extern int aurora_adj_auto_color(ulong h);
+    [DllImport(Dll)] public static extern int aurora_adj_clarity(ulong h, int amount);
+
+    // ---------- v3.0 effects library ----------
+    [DllImport(Dll)] public static extern int aurora_filter_box_blur(ulong h, int radius);
+    [DllImport(Dll)] public static extern int aurora_filter_motion_blur(ulong h, int length, float angle);
+    [DllImport(Dll)] public static extern int aurora_filter_zoom_blur(ulong h, int amount);
+    [DllImport(Dll)] public static extern int aurora_filter_unsharp(ulong h, float radius, float strength, int threshold);
+    [DllImport(Dll)] public static extern int aurora_filter_find_edges(ulong h, int invert);
+    [DllImport(Dll)] public static extern int aurora_filter_oil_paint(ulong h, int radius);
+    [DllImport(Dll)] public static extern int aurora_filter_halftone(ulong h, int cell);
+    [DllImport(Dll)] public static extern int aurora_filter_charcoal(ulong h, int detail);
+    [DllImport(Dll)] public static extern int aurora_filter_pencil(ulong h, int strength);
+    [DllImport(Dll)] public static extern int aurora_filter_median(ulong h);
+    [DllImport(Dll)] public static extern int aurora_filter_vignette(ulong h, int amount, int roundness);
+    [DllImport(Dll)] public static extern int aurora_filter_bloom(ulong h, float radius, int intensity);
+    [DllImport(Dll)] public static extern int aurora_filter_grain(ulong h, int amount, int size);
+    [DllImport(Dll)] public static extern int aurora_filter_scanlines(ulong h, int spacing, int intensity);
+    [DllImport(Dll)] public static extern int aurora_filter_glitch(ulong h, int strength);
+    [DllImport(Dll)] public static extern int aurora_filter_chromatic(ulong h, int amount);
+    [DllImport(Dll)] public static extern int aurora_filter_duotone(ulong h, byte sr, byte sg, byte sb, byte hr, byte hg, byte hb);
+    [DllImport(Dll)] public static extern int aurora_filter_ripple(ulong h, float amplitude, float wavelength, float cx, float cy);
+    [DllImport(Dll)] public static extern int aurora_filter_pinch(ulong h, int amount, float cx, float cy, float radius);
+    [DllImport(Dll)] public static extern int aurora_filter_clouds(ulong h, float scale, uint seed, int opacity);
+
     [DllImport(Dll)] public static extern int aurora_undo(ulong h);
     [DllImport(Dll)] public static extern int aurora_redo(ulong h);
     [DllImport(Dll)] public static extern int aurora_history_set(ulong h, uint index);
@@ -104,7 +144,9 @@ public static unsafe class Engine
 
     [DllImport(Dll)] public static extern int aurora_doc_export(ulong h, byte* path, byte* format, int quality, int compression, int lossless, int frames);
 
+    [DllImport(Dll)] public static extern int aurora_histogram(ulong h, byte* buf, uint cap);
     [DllImport(Dll)] public static extern int aurora_selftest();
+    [DllImport(Dll)] public static extern int aurora_ops_audit();
 
     // ---------- helpers ----------
 
@@ -236,5 +278,21 @@ public static unsafe class Engine
     {
         fixed (byte* p = buf)
             return aurora_layer_thumbnail(h, id, size, p, (uint)buf.Length);
+    }
+
+    /// <summary>Read the 256-bin normalized luminance histogram of the composite.</summary>
+    public static byte[]? Histogram(ulong h)
+    {
+        try
+        {
+            if (h == 0) return null;
+            var buf = new byte[256];
+            fixed (byte* p = buf)
+            {
+                if (aurora_histogram(h, p, 256) != 256) return null;
+            }
+            return buf;
+        }
+        catch { return null; }
     }
 }

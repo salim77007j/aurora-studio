@@ -142,6 +142,23 @@ public class CanvasView : Control
         _win?.UpdateStatus();
     }
 
+    /// <summary>Pan the view so that the given document-space point sits at the viewport center (Navigator).</summary>
+    public void CenterOnDocumentPoint(double docX, double docY)
+    {
+        double vw = Bounds.Width, vh = Bounds.Height;
+        if (vw < 10 || vh < 10) return;
+        Pan = new Vector(vw / 2 - docX * Zoom, vh / 2 - docY * Zoom);
+        InvalidateVisual();
+    }
+
+    /// <summary>The visible portion of the document in doc coordinates (Navigator viewport rect).</summary>
+    public Rect VisibleDocRect()
+    {
+        var tl = ScreenToDoc(new Point(0, 0));
+        var br = ScreenToDoc(new Point(Bounds.Width, Bounds.Height));
+        return new Rect(tl, br);
+    }
+
     public void FitOrActual(bool actual = false)
     {
         var doc = _win?.ActiveDoc;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Avalonia.Controls;
@@ -11,6 +12,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using AuroraStudio.Interop;
 using AuroraStudio.Models;
+using AuroraStudio.Panels;
 
 namespace AuroraStudio.Views;
 
@@ -338,6 +340,183 @@ public static class ToolDemo
                 try { File.Delete(tmp); } catch { }
             }
 
+            // ---------- v3.0: image import (real open path) ----------
+            string importPath = Path.Combine(Path.GetTempPath(), $"aurora_import_{Guid.NewGuid():N}.png");
+            Run("import", "export sample then open via OpenImagePath", () =>
+            {
+                int rc = Engine.DocExport(handle, importPath, "png", 90, 6, true, false);
+                if (rc != 0) throw new Exception("sample export failed: " + Engine.LastError());
+            });
+            Run("import", "OpenImagePath creates a real tab", () =>
+            {
+                _win.OpenImagePath(importPath);
+            }, () =>
+            {
+                var imported = _win.Tabs.LastOrDefault(t => t.Doc.Title.Contains("aurora_import"));
+                if (imported == null) return false;
+                _importedDoc = imported.Doc;
+                return _importedDoc.Width > 0 && _importedDoc.Height > 0;
+            }, "imported tab present with real dimensions");
+            try { File.Delete(importPath); } catch { }
+
+            // ---------- v3.0: new professional adjustments (engine = same call the menus make) ----------
+            Run("adjust", "exposure/gamma", () => Expect(Engine.aurora_adj_exposure(handle, 0.25f, 1.1f)));
+            Run("adjust", "vibrance", () => Expect(Engine.aurora_adj_vibrance(handle, 35)));
+            Run("adjust", "white balance", () => Expect(Engine.aurora_adj_white_balance(handle, 20, -8)));
+            Run("adjust", "shadows/highlights", () => Expect(Engine.aurora_adj_shadows_highlights(handle, 30, -15)));
+            Run("adjust", "color balance", () => Expect(Engine.aurora_adj_color_balance(handle, 8, -4, 6)));
+            Run("adjust", "black & white", () => Expect(Engine.aurora_adj_black_white(handle, 15, 0, -8)));
+            Run("adjust", "desaturate", () => Expect(Engine.aurora_adj_desaturate(handle)));
+            Run("adjust", "invert", () => Expect(Engine.aurora_adj_invert(handle)));
+            Run("adjust", "threshold", () => Expect(Engine.aurora_adj_threshold(handle, 120)));
+            Run("adjust", "posterize", () => Expect(Engine.aurora_adj_posterize(handle, 8)));
+            Run("adjust", "photo filter", () => Expect(Engine.aurora_adj_photo_filter(handle, 236, 138, 0, 30, 1)));
+            Run("adjust", "gradient map", () => Expect(Engine.aurora_adj_gradient_map(handle, 20, 10, 60, 250, 240, 200)));
+            Run("adjust", "auto tone", () => Expect(Engine.aurora_adj_auto_tone(handle)));
+            Run("adjust", "auto contrast", () => Expect(Engine.aurora_adj_auto_contrast(handle)));
+            Run("adjust", "auto color", () => Expect(Engine.aurora_adj_auto_color(handle)));
+            Run("adjust", "clarity", () => Expect(Engine.aurora_adj_clarity(handle, 30)));
+            _doc.RefreshState();
+            _win.RefreshPanels();
+
+            // ---------- v3.0: effects library ----------
+            Run("filter", "box blur", () => Expect(Engine.aurora_filter_box_blur(handle, 4)));
+            Run("filter", "motion blur", () => Expect(Engine.aurora_filter_motion_blur(handle, 14, 25.0f)));
+            Run("filter", "zoom blur", () => Expect(Engine.aurora_filter_zoom_blur(handle, 25)));
+            Run("filter", "unsharp mask", () => Expect(Engine.aurora_filter_unsharp(handle, 3.0f, 1.2f, 4)));
+            Run("filter", "find edges", () => Expect(Engine.aurora_filter_find_edges(handle, 0)));
+            Run("filter", "oil paint", () => Expect(Engine.aurora_filter_oil_paint(handle, 3)));
+            Run("filter", "halftone", () => Expect(Engine.aurora_filter_halftone(handle, 9)));
+            Run("filter", "charcoal", () => Expect(Engine.aurora_filter_charcoal(handle, 6)));
+            Run("filter", "pencil sketch", () => Expect(Engine.aurora_filter_pencil(handle, 6)));
+            Run("filter", "median denoise", () => Expect(Engine.aurora_filter_median(handle)));
+            Run("filter", "vignette", () => Expect(Engine.aurora_filter_vignette(handle, 55, 50)));
+            Run("filter", "bloom", () => Expect(Engine.aurora_filter_bloom(handle, 10.0f, 45)));
+            Run("filter", "film grain", () => Expect(Engine.aurora_filter_grain(handle, 25, 2)));
+            Run("filter", "scanlines", () => Expect(Engine.aurora_filter_scanlines(handle, 6, 50)));
+            Run("filter", "glitch", () => Expect(Engine.aurora_filter_glitch(handle, 22)));
+            Run("filter", "chromatic aberration", () => Expect(Engine.aurora_filter_chromatic(handle, 30)));
+            Run("filter", "duotone", () => Expect(Engine.aurora_filter_duotone(handle, 30, 20, 80, 250, 230, 180)));
+            Run("filter", "ripple", () => Expect(Engine.aurora_filter_ripple(handle, 8.0f, 44.0f, -1.0f, -1.0f)));
+            Run("filter", "pinch/bulge", () => Expect(Engine.aurora_filter_pinch(handle, 40, -1.0f, -1.0f, 0.0f)));
+            Run("filter", "render clouds", () => Expect(Engine.aurora_filter_clouds(handle, 10.0f, 42, 65)));
+            _doc.RefreshState();
+            _win.RefreshPanels();
+
+            // ---------- v3.0: histogram + navigator panels ----------
+            Run("panel", "histogram reads real composite bins", () =>
+            {
+                // clear any selection restored by the undo/redo sweep so the
+                // histogram covers the whole composite
+                Engine.aurora_select_all(handle);
+                _doc.RefreshState();
+                _win.HistogramPanelCtl.Refresh(_doc);
+            }, () =>
+            {
+                var h = Engine.Histogram(handle);
+                if (h == null)
+                {
+                    Console.Error.WriteLine("[tooldemo] histogram: engine returned null, lastErr=" + Engine.LastError());
+                    return false;
+                }
+                int nz = h.Count(b => b > 0);
+                Console.Error.WriteLine($"[tooldemo] histogram: {nz} non-zero bins, max={h.Max()}");
+                return nz > 0;
+            });
+            Run("panel", "navigator thumbnail + viewport", () =>
+            {
+                _win.NavigatorPanelCtl.Refresh(_doc);
+                _win.TheCanvas.CenterOnDocumentPoint(_doc.Width / 2.0, _doc.Height / 2.0);
+                var vis = _win.TheCanvas.VisibleDocRect();
+                if (vis.Width <= 0) throw new Exception("empty viewport rect");
+            });
+
+            // ---------- v3.0: history panel click path (was the crash site #1) ----------
+            ulong layerBeforeClick = Engine.ActiveLayer(handle);
+            Run("panel", "history: programmatic entry click (real SelectionChanged)", () =>
+            {
+                // build a few history entries then drive the REAL list selection
+                Engine.aurora_adj_bc(handle, 4, 4);
+                _doc.RefreshState();
+                _win.RefreshPanels();
+                var list = GetPrivateList(typeof(HistoryPanel), _win.HistoryPanelCtl);
+                int idx = Math.Clamp(_doc.History.Index - 1, 0, Math.Max(0, list.ItemCount - 1));
+                list.SelectedIndex = idx; // fires SelectionChanged → deferred engine history_set
+            });
+            await Task.Delay(400); // let the deferred handler run
+            Run("panel", "history: click actually moved history", () =>
+            {
+                _doc.RefreshState();
+            }, () => _doc.History.Index >= 0, $"history index now {_doc.History.Index}");
+
+            // stress: click + immediate refresh + click again (the old re-entrancy crash sequence)
+            Run("panel", "history: stress click/refresh/click", () =>
+            {
+                var list = GetPrivateList(typeof(HistoryPanel), _win.HistoryPanelCtl);
+                list.SelectedIndex = 1;
+                _win.RefreshPanels();
+                list.SelectedIndex = Math.Min(2, list.ItemCount - 1);
+                _win.RefreshPanels();
+            });
+            await Task.Delay(400);
+
+            // ---------- v3.0: layers panel click path (was the crash site #2) ----------
+            Run("panel", "layers: programmatic row click (real SelectionChanged)", () =>
+            {
+                var list = GetPrivateList(typeof(LayersPanel), _win.LayersPanelCtl);
+                if (list.ItemCount > 0)
+                    list.SelectedIndex = 0; // fires SelectionChanged → OnRowSelected
+            });
+            await Task.Delay(300);
+            Run("panel", "layers: stress click/refresh/click", () =>
+            {
+                var list = GetPrivateList(typeof(LayersPanel), _win.LayersPanelCtl);
+                list.SelectedIndex = 0;
+                _win.RefreshPanels();
+                if (list.ItemCount > 1) list.SelectedIndex = 1;
+                _win.RefreshPanels();
+            });
+            await Task.Delay(300);
+
+            // ---------- v3.0: text overlay path (was the crash site #3) ----------
+            Run("text", "overlay editor open + reopen (old NRE path)", () =>
+            {
+                _win.SelectTool(ToolKind.Text);
+                _win.ShowTextEditorAt(new Avalonia.Point(320, 220), new Avalonia.Point(320, 220));
+                _win.ShowTextEditorAt(new Avalonia.Point(340, 240), new Avalonia.Point(340, 240)); // second call = HideTextEditor inside
+                _win.HideTextEditor(false);
+            });
+            Run("text", "commit text to layer", () =>
+            {
+                _win.RenderTextToLayer(_doc, "Aurora 3.0", new Avalonia.Point(120, 120),
+                    Color.FromRgb(0xFF, 0xFF, 0xFF), "Inter", 48, true, false);
+            });
+
+            // ---------- v3.0: menu commands (RelayCommand wiring, non-dialog ops) ----------
+            foreach (var (name, prop) in new[]
+            {
+                ("invert", "CmdAdjInvert"), ("desaturate", "CmdAdjDesaturate"),
+                ("autotone", "CmdAutoTone"), ("autocontrast", "CmdAutoContrast"),
+                ("autocolor", "CmdAutoColor"), ("autoenhance", "CmdAutoEnhance"),
+                ("median", "CmdFMedian"), ("findedges", "CmdFFindEdges"), ("emboss", "CmdFEmboss"),
+            })
+            {
+                string n = name; string p = prop;
+                Run("command", $"{n} via ICommand.Execute", () =>
+                {
+                    var propInfo = typeof(MainWindow).GetProperty(p);
+                    var cmd = (System.Windows.Input.ICommand)(propInfo?.GetValue(_win) ?? throw new Exception($"{p} missing"));
+                    cmd.Execute(null);
+                    _doc.RefreshState();
+                });
+            }
+            Run("command", "undo x8 after command sweep", () =>
+            {
+                for (int i = 0; i < 8; i++) Engine.aurora_undo(handle);
+                _doc.RefreshState();
+                _win.RefreshPanels();
+            });
+
             _win.SelectTool(ToolKind.RectSelect);
             _doc.RefreshState();
             _win.RefreshPanels();
@@ -386,5 +565,20 @@ public static class ToolDemo
             }
             return false;
         }
+    }
+
+    private static AuroraDocument? _importedDoc;
+
+    private static void Expect(int rc)
+    {
+        if (rc != 0) throw new Exception("engine rc=" + rc + ": " + Engine.LastError());
+    }
+
+    /// <summary>Access a panel's private ListBox to drive the REAL SelectionChanged pipeline
+    /// (reproduces the user's click path — the exact sequence that crashed v2.1).</summary>
+    private static ListBox GetPrivateList(Type panelType, object panel)
+    {
+        var f = panelType.GetField("_list", BindingFlags.NonPublic | BindingFlags.Instance);
+        return (ListBox)(f?.GetValue(panel) ?? throw new Exception("panel list not found"));
     }
 }

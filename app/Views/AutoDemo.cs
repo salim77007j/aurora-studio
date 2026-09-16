@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using AuroraStudio.Interop;
 using AuroraStudio.Models;
 
@@ -106,8 +107,41 @@ public static class AutoDemo
             win.SelectTool(ToolKind.RectSelect);
             await Task.Delay(150);
 
+            // 6b. in-window screenshot: render the real visual tree to a PNG
+            // (independent of OS screen capture — always works, even headless-ish runners)
+            try
+            {
+                // reset right-dock scroll so the capture shows the whole panel stack
+                var dock = win.FindAny<Avalonia.Controls.Border>("RightDock");
+                var sv = dock?.Child as Avalonia.Controls.ScrollViewer
+                         ?? (dock?.GetVisualDescendants().OfType<Avalonia.Controls.ScrollViewer>().FirstOrDefault());
+                sv?.ScrollToHome();
+                win.BuildRecentMenu();
+                await Task.Delay(300); // let layout + a final composite frame land
+                // history selection auto-scroll may re-scroll the dock; force home again
+                if (sv != null && sv.Offset.Y > 0)
+                {
+                    sv.ScrollToHome();
+                    await Task.Delay(120);
+                }
+                Console.Error.WriteLine($"[autodemo] dock sv={(sv != null)} offsetY={sv?.Offset.Y:0.0}");
+
+                var shotPath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(readyPath))!, "aurora_ui_capture.png");
+                var size = new Avalonia.Size(win.Bounds.Width, win.Bounds.Height);
+                var rtb = new Avalonia.Media.Imaging.RenderTargetBitmap(
+                    new Avalonia.PixelSize((int)size.Width, (int)size.Height), new Avalonia.Vector(96, 96));
+                rtb.Render(win);
+                using (var fs = File.Create(shotPath))
+                    rtb.Save(fs);
+                Console.Error.WriteLine($"[autodemo] UI capture written: {shotPath} ({new FileInfo(shotPath).Length} bytes)");
+            }
+            catch (Exception capEx)
+            {
+                Console.Error.WriteLine("[autodemo] UI capture failed (non-fatal): " + capEx.Message);
+            }
+
             // signal ready for external capture
-            Directory.CreateDirectory(Path.GetDirectoryName(readyPath)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(readyPath))!);
             File.WriteAllText(readyPath, "ok");
         }
         catch (Exception ex)

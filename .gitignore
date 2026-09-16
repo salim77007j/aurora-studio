@@ -1,10 +1,7 @@
-bin/
-obj/
-publish/
-engine/target/
 app/aurora_engine.dll
 app/aurora_engine.so
-*.user
-.vs/
-crash.log
-.avalonia-build-tasks/
+app/bin/
+app/obj/
+app/publish/
+engine/target/
+app/.avalonia-build-tasks/
